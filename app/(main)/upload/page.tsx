@@ -6,7 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { apiFetch } from "@/lib/client-fetch";
-import type { Material, Subject } from "@/types";
+import type { Subject } from "@/types";
+
+interface StudyMaterialRow {
+  id: string;
+  filename: string;
+  extracted_text: string;
+}
 
 export default function UploadPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -25,21 +31,25 @@ export default function UploadPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!subjectId) return;
+    if (!subjectId || !file) return;
 
     setLoading(true);
     setMessage("");
     const formData = new FormData();
-    formData.append("subjectId", subjectId);
-    formData.append("title", title || "Uploaded material");
-    if (file) formData.append("file", file);
+    formData.append("subject_id", subjectId);
+    formData.append("file", file);
 
     try {
-      const material = await apiFetch<Material>("/api/materials", {
-        method: "POST",
-        body: formData,
-      });
-      setMessage(`Uploaded "${material.title}" (${material.extractedText.length} chars extracted)`);
+      const material = await apiFetch<StudyMaterialRow>(
+        "/api/materials/upload",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+      setMessage(
+        `Uploaded "${material.filename}" (${material.extracted_text.length} chars extracted)`,
+      );
       setTitle("");
       setFile(null);
     } catch (err) {
@@ -72,7 +82,7 @@ export default function UploadPage() {
               </select>
             </div>
             <Input
-              label="Title"
+              label="Title (optional)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Chapter notes"
@@ -83,12 +93,13 @@ export default function UploadPage() {
               </label>
               <input
                 type="file"
-                accept=".pdf"
+                accept=".pdf,application/pdf"
+                required
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 className="w-full text-sm text-zinc-400"
               />
             </div>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || !file}>
               {loading ? "Uploading..." : "Upload"}
             </Button>
             {message ? <p className="text-sm text-zinc-400">{message}</p> : null}

@@ -17,10 +17,21 @@ export async function apiFetch<T>(
   }
 
   const res = await fetch(path, { ...options, headers });
-  const json = (await res.json()) as ApiResponse<T>;
+  const raw = await res.text();
+
+  let json: ApiResponse<T>;
+  try {
+    json = raw ? (JSON.parse(raw) as ApiResponse<T>) : {};
+  } catch {
+    throw new Error(
+      res.ok
+        ? "Invalid server response"
+        : `Request failed (${res.status})`,
+    );
+  }
 
   if (!res.ok || json.error) {
-    throw new Error(json.error ?? "Request failed");
+    throw new Error(json.error ?? `Request failed (${res.status})`);
   }
 
   return json.data as T;
