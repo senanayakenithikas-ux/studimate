@@ -1,15 +1,19 @@
-import { getAuthToken } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
 import type { ApiResponse } from "@/types";
 
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getAuthToken();
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   const headers = new Headers(options.headers);
 
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+  if (session?.access_token) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
   }
 
   if (options.body && !(options.body instanceof FormData)) {

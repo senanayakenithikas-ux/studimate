@@ -1,37 +1,59 @@
-import type { StudySession } from "@/types";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+"use client";
 
-interface TodayPlanProps {
-  sessions: StudySession[];
-  onComplete?: (sessionId: string) => void;
+import { Calendar } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
+
+export interface TodayPlanSession {
+  id: number;
+  subject: string;
+  topic: string;
+  duration: number;
+  completed: boolean;
 }
 
-export function TodayPlan({ sessions, onComplete }: TodayPlanProps) {
+interface TodayPlanProps {
+  sessions: TodayPlanSession[];
+  onToggleSession: (id: number) => void;
+}
+
+export function TodayPlan({ sessions, onToggleSession }: TodayPlanProps) {
   return (
-    <Card title="Today's plan">
-      <ul className="space-y-3">
+    <div className="bg-card rounded-xl border border-border p-5">
+      <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+        <Calendar className="w-5 h-5 text-indigo-400" />
+        Today&apos;s Plan
+      </h3>
+      <div className="space-y-3">
         {sessions.map((session) => (
-          <li
+          <div
             key={session.id}
-            className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2"
+            className={cn(
+              "flex items-center gap-3 p-3 rounded-lg bg-secondary/50 transition-all duration-200",
+              session.completed && "opacity-60",
+            )}
           >
-            <div>
-              <p className="text-sm font-medium text-white">{session.title}</p>
-              <p className="text-xs text-zinc-500">
-                {session.durationMinutes} min
+            <Checkbox
+              checked={session.completed}
+              onCheckedChange={() => onToggleSession(session.id)}
+              className="border-indigo-500 data-[state=checked]:bg-indigo-500"
+            />
+            <div className="flex-1 min-w-0">
+              <p
+                className={cn(
+                  "font-medium text-sm text-foreground",
+                  session.completed && "line-through text-muted-foreground",
+                )}
+              >
+                {session.subject}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {session.topic} • {session.duration} min
               </p>
             </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onComplete?.(session.id)}
-            >
-              Done
-            </Button>
-          </li>
+          </div>
         ))}
-      </ul>
-    </Card>
+      </div>
+    </div>
   );
 }

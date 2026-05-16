@@ -1,5 +1,7 @@
 // Mock data for Studimate (Hours 1-6)
 
+import type { Profile, Streak, Subject as ApiSubject } from "@/types";
+
 export const mockUser = {
   name: "Yapa",
   streak: 7,
@@ -232,3 +234,23 @@ export type Session = (typeof mockTodaySessions)[number];
 export type QuizQuestion = (typeof mockQuiz)[number];
 export type Material = (typeof mockMaterials)[number];
 export type ChatMessage = (typeof mockChatMessages)[number];
+
+export const MOCK_SUBJECTS: ApiSubject[] = mockSubjects.map((s) => ({
+  id: `sub-${s.id}`,
+  name: s.name,
+  examDate: s.examDate,
+  confidence: Math.min(5, Math.max(1, Math.round(s.confidence / 2))),
+}));
+
+export const MOCK_STREAK: Streak = {
+  current: mockUser.streak,
+  longest: mockUser.streak,
+  lastStudyDate: new Date().toISOString().slice(0, 10),
+};
+
+export const MOCK_PROFILE: Profile = {
+  id: "profile-1",
+  username: "student",
+  displayName: mockUser.name,
+  onboardingComplete: false,
+};

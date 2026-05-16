@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { Plus, X, Calendar, Sparkles, ArrowRight, Check } from "lucide-react";
+import { apiFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 
 interface Subject {
@@ -24,6 +25,7 @@ export default function OnboardingPage() {
     { id: 1, name: "", examDate: "", confidence: 5, dailyHours: 1 },
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const addSubject = () => {
     setSubjects([
@@ -62,13 +64,32 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     setIsLoading(true);
-    // Simulate saving - replace with real API call after Hour 6
-    setTimeout(() => {
-      setIsLoading(false);
+    setError(null);
+    try {
+      await apiFetch("/api/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ onboardingComplete: true }),
+      });
+      for (const subject of validSubjects) {
+        await apiFetch("/api/subjects", {
+          method: "POST",
+          body: JSON.stringify({
+            name: subject.name,
+            examDate: subject.examDate,
+            confidence: Math.min(5, Math.max(1, Math.round(subject.confidence / 2))),
+          }),
+        });
+      }
       router.push("/dashboard");
-    }, 1500);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to save onboarding",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const validSubjects = subjects.filter((s) => s.name && s.examDate);
@@ -313,6 +334,9 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex flex-col gap-3 pt-4 max-w-xs mx-auto">
+              {error ? (
+                <p className="text-sm text-destructive text-center">{error}</p>
+              ) : null}
               <Button
                 onClick={handleFinish}
                 disabled={isLoading}

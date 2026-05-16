@@ -3,18 +3,20 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AppLayout } from "@/components/app-layout";
-import { SubjectCard } from "@/components/subject-card";
+import { useUserProfile } from "@/hooks/use-user-profile";
+import { StreakWidget } from "@/components/dashboard/StreakWidget";
+import { SubjectCard } from "@/components/dashboard/SubjectCard";
+import { TodayPlan } from "@/components/dashboard/TodayPlan";
 import { CardSkeleton } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   mockUser,
-  mockSubjects,
   mockTodaySessions,
-  type Subject,
   type Session,
 } from "@/lib/mock-data";
-import { Flame, Calendar, Brain, MessageSquare, Sparkles, Plus, X } from "lucide-react";
+import { apiFetch } from "@/lib/client-fetch";
+import type { Streak, Subject as ApiSubject } from "@/types";
+import { Calendar, Brain, MessageSquare, Sparkles, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -26,71 +28,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-function StreakCard({ streak }: { streak: number }) {
-  return (
-    <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 rounded-xl border border-emerald-500/30 p-5">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-          <Flame className="w-6 h-6 text-emerald-400" />
-        </div>
-        <div>
-          <p className="text-sm text-emerald-300/80">Current Streak</p>
-          <p className="text-3xl font-bold text-emerald-400">{streak} days</p>
-        </div>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Keep it up! You&apos;re on fire!
-      </p>
-    </div>
-  );
-}
-
-function TodaysPlanCard({
-  sessions,
-  onToggleSession,
-}: {
-  sessions: Session[];
-  onToggleSession: (id: number) => void;
-}) {
-  return (
-    <div className="bg-card rounded-xl border border-border p-5">
-      <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-        <Calendar className="w-5 h-5 text-indigo-400" />
-        Today&apos;s Plan
-      </h3>
-      <div className="space-y-3">
-        {sessions.map((session) => (
-          <div
-            key={session.id}
-            className={cn(
-              "flex items-center gap-3 p-3 rounded-lg bg-secondary/50 transition-all duration-200",
-              session.completed && "opacity-60"
-            )}
-          >
-            <Checkbox
-              checked={session.completed}
-              onCheckedChange={() => onToggleSession(session.id)}
-              className="border-indigo-500 data-[state=checked]:bg-indigo-500"
-            />
-            <div className="flex-1 min-w-0">
-              <p
-                className={cn(
-                  "font-medium text-sm text-foreground",
-                  session.completed && "line-through text-muted-foreground"
-                )}
-              >
-                {session.subject}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {session.topic} • {session.duration} min
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function QuickActions() {
   const actions = [
@@ -139,10 +76,31 @@ function QuickActions() {
 
 const subjectColors = ["indigo", "violet", "emerald", "amber", "rose", "cyan"] as const;
 
+type DashboardSubject = {
+  id: number;
+  apiId: string;
+  name: string;
+  examDate: string;
+  confidence: number;
+  dailyHours: number;
+  progress: number;
+  color: (typeof subjectColors)[number];
+};
+
 export default function DashboardPage() {
+  return (
+    <AppLayout>
+      <DashboardContent />
+    </AppLayout>
+  );
+}
+
+function DashboardContent() {
+  const { displayName } = useUserProfile();
   const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState(mockUser);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [streak, setStreak] = useState(mockUser.streak);
+  const [subjects, setSubjects] = useState<DashboardSubject[]>([]);
   const [todaySessions, setTodaySessions] = useState<Session[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newSubject, setNewSubject] = useState({
@@ -153,40 +111,85 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    // Simulate loading data
-    const timer = setTimeout(() => {
-      setSubjects(mockSubjects);
-      setTodaySessions(mockTodaySessions);
-      setIsLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
+    async function load() {
+      setError(null);
+      try {
+        const [streakData, subjectsData] = await Promise.all([
+          apiFetch<Streak>("/api/streaks"),
+          apiFetch<ApiSubject[]>("/api/subjects"),
+        ]);
+        setStreak(streakData.current);
+        setSubjects(
+          subjectsData.map((s, i) => ({
+            id: i + 1,
+            apiId: s.id,
+            name: s.name,
+            examDate: s.examDate,
+            confidence: s.confidence,
+            dailyHours: 1,
+            progress: 0,
+            color: subjectColors[i % subjectColors.length],
+          })),
+        );
+        setTodaySessions(mockTodaySessions);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load dashboard",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    void load();
   }, []);
 
-  const toggleSession = (id: number) => {
-    setTodaySessions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, completed: !s.completed } : s))
-    );
+  const toggleSession = async (id: number) => {
+    const session = todaySessions.find((s) => s.id === id);
+    if (!session || session.completed) return;
+    try {
+      await apiFetch("/api/sessions", {
+        method: "POST",
+        body: JSON.stringify({ sessionId: String(id) }),
+      });
+      setTodaySessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, completed: true } : s)),
+      );
+    } catch {
+      // keep UI unchanged on failure
+    }
   };
 
-  const handleAddSubject = () => {
+  const handleAddSubject = async () => {
     if (!newSubject.name || !newSubject.examDate) return;
-    
-    const newId = Math.max(...subjects.map((s) => s.id), 0) + 1;
-    const colorIndex = subjects.length % subjectColors.length;
-    
-    const subject: Subject = {
-      id: newId,
-      name: newSubject.name,
-      examDate: newSubject.examDate,
-      confidence: newSubject.confidence,
-      dailyHours: newSubject.dailyHours,
-      progress: 0,
-      color: subjectColors[colorIndex],
-    };
-    
-    setSubjects((prev) => [...prev, subject]);
-    setNewSubject({ name: "", examDate: "", dailyHours: 1, confidence: 5 });
-    setIsAddDialogOpen(false);
+
+    try {
+      const created = await apiFetch<ApiSubject>("/api/subjects", {
+        method: "POST",
+        body: JSON.stringify({
+          name: newSubject.name,
+          examDate: newSubject.examDate,
+          confidence: Math.min(5, Math.max(1, newSubject.confidence)),
+        }),
+      });
+      const colorIndex = subjects.length % subjectColors.length;
+      setSubjects((prev) => [
+        ...prev,
+        {
+          id: prev.length + 1,
+          apiId: created.id,
+          name: created.name,
+          examDate: created.examDate,
+          confidence: created.confidence,
+          dailyHours: newSubject.dailyHours,
+          progress: 0,
+          color: subjectColors[colorIndex],
+        },
+      ]);
+      setNewSubject({ name: "", examDate: "", dailyHours: 1, confidence: 5 });
+      setIsAddDialogOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add subject");
+    }
   };
 
   // Get greeting based on time
@@ -204,13 +207,13 @@ export default function DashboardPage() {
   });
 
   return (
-    <AppLayout userName={user.name}>
+    <>
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              {getGreeting()}, {user.name}
+              {getGreeting()}, {displayName}
             </h1>
             <p className="text-muted-foreground">{today}</p>
           </div>
@@ -220,6 +223,13 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {error && !isLoading ? (
+        <div className="flex flex-col items-center justify-center gap-4 py-12">
+          <p className="text-sm text-destructive">{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div className="space-y-6">
@@ -237,8 +247,8 @@ export default function DashboardPage() {
         <div className="space-y-8">
           {/* Top Row: Streak + Today's Plan */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <StreakCard streak={user.streak} />
-            <TodaysPlanCard
+            <StreakWidget streak={streak} />
+            <TodayPlan
               sessions={todaySessions}
               onToggleSession={toggleSession}
             />
@@ -354,6 +364,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-    </AppLayout>
+    </>
   );
 }

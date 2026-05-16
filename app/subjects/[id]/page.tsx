@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProgressBar } from "@/components/progress-bar";
 import {
-  mockUser,
   mockSubjects,
   mockMaterials,
   type Material,
@@ -160,7 +159,7 @@ export default function SubjectPage() {
 
   if (isLoading) {
     return (
-      <AppLayout userName={mockUser.name}>
+      <AppLayout>
         <div className="animate-pulse space-y-6">
           <div className="h-8 w-48 bg-secondary rounded-lg" />
           <div className="h-32 bg-secondary rounded-xl" />
@@ -176,7 +175,7 @@ export default function SubjectPage() {
 
   if (!subject) {
     return (
-      <AppLayout userName={mockUser.name}>
+      <AppLayout>
         <div className="flex flex-col items-center justify-center py-20">
           <p className="text-muted-foreground mb-4">Subject not found</p>
           <Link href="/dashboard">
@@ -200,7 +199,7 @@ export default function SubjectPage() {
   const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   return (
-    <AppLayout userName={mockUser.name}>
+    <AppLayout>
       {/* Header */}
       <div className="mb-8">
         <Link

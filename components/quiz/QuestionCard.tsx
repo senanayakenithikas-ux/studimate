@@ -1,48 +1,104 @@
+"use client";
+
+import { Check, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { QuizQuestion } from "@/types";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 
 interface QuestionCardProps {
   question: QuizQuestion;
-  selectedIndex: number | null;
-  onSelect: (index: number) => void;
-  onNext: () => void;
-  isLast: boolean;
+  questionIndex: number;
+  totalQuestions: number;
+  selectedAnswer: number | null;
+  showResult: boolean;
+  onSelectAnswer: (index: number) => void;
 }
 
 export function QuestionCard({
   question,
-  selectedIndex,
-  onSelect,
-  onNext,
-  isLast,
+  questionIndex,
+  totalQuestions,
+  selectedAnswer,
+  showResult,
+  onSelectAnswer,
 }: QuestionCardProps) {
   return (
-    <Card title={question.question}>
-      <ul className="space-y-2">
-        {question.options.map((option, index) => (
-          <li key={index}>
-            <button
-              type="button"
-              onClick={() => onSelect(index)}
-              className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
-                selectedIndex === index
-                  ? "border-indigo-500 bg-indigo-600/20 text-white"
-                  : "border-zinc-700 text-zinc-300 hover:border-zinc-600"
-              }`}
-            >
-              {option}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <Button
-        className="mt-4"
-        disabled={selectedIndex === null}
-        onClick={onNext}
-      >
-        {isLast ? "See results" : "Next question"}
-      </Button>
-    </Card>
+    <>
+      <div className="flex items-center justify-between mb-6">
+        <span className="text-sm text-muted-foreground">
+          Question {questionIndex + 1} of {totalQuestions}
+        </span>
+      </div>
+
+      <div className="bg-card rounded-xl border border-border p-6 mb-6">
+        <h2 className="text-xl font-semibold text-foreground mb-6">
+          {question.question}
+        </h2>
+
+        <div className="space-y-3">
+          {question.options.map((option, index) => {
+            const isSelected = selectedAnswer === index;
+            const isCorrect = index === question.correctIndex;
+
+            return (
+              <button
+                key={index}
+                type="button"
+                onClick={() => onSelectAnswer(index)}
+                disabled={showResult}
+                className={cn(
+                  "w-full flex items-center gap-4 p-4 rounded-lg border transition-all duration-200 text-left",
+                  showResult
+                    ? isCorrect
+                      ? "bg-emerald-500/20 border-emerald-500"
+                      : isSelected
+                        ? "bg-rose-500/20 border-rose-500"
+                        : "bg-card border-border opacity-50"
+                    : isSelected
+                      ? "bg-indigo-500/20 border-indigo-500"
+                      : "bg-card border-border hover:border-indigo-500/50",
+                )}
+              >
+                <span
+                  className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium",
+                    showResult
+                      ? isCorrect
+                        ? "bg-emerald-500 text-white"
+                        : isSelected
+                          ? "bg-rose-500 text-white"
+                          : "bg-secondary text-muted-foreground"
+                      : isSelected
+                        ? "bg-indigo-500 text-white"
+                        : "bg-secondary text-muted-foreground",
+                  )}
+                >
+                  {String.fromCharCode(65 + index)}
+                </span>
+                <span className="flex-1 text-foreground">{option}</span>
+                {showResult && isCorrect && (
+                  <Check className="w-5 h-5 text-emerald-400" />
+                )}
+                {showResult && isSelected && !isCorrect && (
+                  <X className="w-5 h-5 text-rose-400" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {showResult && (
+        <div className="bg-secondary/50 rounded-xl border border-border p-4 mb-6">
+          <p className="text-sm font-medium text-foreground mb-2">
+            {selectedAnswer === question.correctIndex ? "Correct!" : "Incorrect"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            The correct answer is{" "}
+            {String.fromCharCode(65 + question.correctIndex)}:{" "}
+            {question.options[question.correctIndex]}
+          </p>
+        </div>
+      )}
+    </>
   );
 }

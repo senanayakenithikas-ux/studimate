@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,14 +10,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mockMaterials, mockSubjects, mockUser, type Material } from "@/lib/mock-data";
-import { Upload, FileText, X, Check, FolderOpen } from "lucide-react";
+import { type Material } from "@/lib/mock-data";
+import { apiFetch } from "@/lib/client-fetch";
+import type { Subject } from "@/types";
+import { Upload, FileText, X, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface UploadedMaterialRow {
+  id: string;
+  filename: string;
+  extracted_text: string;
+}
+
 export default function UploadPage() {
-  const [materials, setMaterials] = useState<Material[]>(mockMaterials);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjectId, setSubjectId] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFile, setUploadingFile] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadSubjects() {
+      try {
+        const data = await apiFetch<Subject[]>("/api/subjects");
+        setSubjects(data);
+        if (data[0]) setSubjectId(data[0].id);
+      } catch (err) {
+        setLoadError(
+          err instanceof Error ? err.message : "Failed to load subjects",
+        );
+      }
+    }
+    void loadSubjects();
+  }, []);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -45,21 +72,39 @@ export default function UploadPage() {
     }
   };
 
-  const handleFileUpload = (file: File) => {
+  const handleFileUpload = async (file: File) => {
+    if (!subjectId) {
+      setUploadError("Add a subject before uploading materials.");
+      return;
+    }
+
+    setUploadError(null);
     setUploadingFile(file.name);
 
-    // Simulate upload
-    setTimeout(() => {
+    const formData = new FormData();
+    formData.append("subject_id", subjectId);
+    formData.append("file", file);
+
+    try {
+      const row = await apiFetch<UploadedMaterialRow>(
+        "/api/materials/upload",
+        { method: "POST", body: formData },
+      );
+      const subjectName =
+        subjects.find((s) => s.id === subjectId)?.name ?? "Subject";
       const newMaterial: Material = {
         id: Date.now(),
-        name: file.name,
+        name: row.filename,
         size: formatFileSize(file.size),
-        subject: mockSubjects[0].name,
+        subject: subjectName,
         uploadedAt: new Date().toISOString().split("T")[0],
       };
       setMaterials((prev) => [newMaterial, ...prev]);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
       setUploadingFile(null);
-    }, 1500);
+    }
   };
 
   const handleRemoveMaterial = (id: number) => {
@@ -79,7 +124,7 @@ export default function UploadPage() {
   };
 
   return (
-    <AppLayout userName={mockUser.name}>
+    <AppLayout>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Upload Materials</h1>
@@ -87,6 +132,32 @@ export default function UploadPage() {
           Upload your study materials for AI-powered learning
         </p>
       </div>
+
+      {loadError ? (
+        <p className="mb-4 text-sm text-destructive">{loadError}</p>
+      ) : null}
+      {uploadError ? (
+        <p className="mb-4 text-sm text-destructive">{uploadError}</p>
+      ) : null}
+
+      {subjects.length > 0 ? (
+        <div className="mb-6 max-w-xs">
+          <label className="mb-1.5 block text-sm text-muted-foreground">
+            Subject for upload
+          </label>
+          <select
+            value={subjectId}
+            onChange={(e) => setSubjectId(e.target.value)}
+            className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm"
+          >
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       {/* Upload Zone */}
       <div
@@ -125,7 +196,7 @@ export default function UploadPage() {
           <label>
             <input
               type="file"
-              accept=".pdf,.txt,.doc,.docx"
+              accept=".pdf,application/pdf"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -204,7 +275,7 @@ export default function UploadPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockSubjects.map((subject) => (
+                        {subjects.map((subject) => (
                           <SelectItem key={subject.id} value={subject.name}>
                             {subject.name}
                           </SelectItem>
