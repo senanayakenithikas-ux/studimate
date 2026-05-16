@@ -1,6 +1,9 @@
 import { jsonError, jsonOk } from "@/lib/api";
+import { usernameToEmail } from "@/lib/auth-credentials";
 import { createAnonClient, createServerClient } from "@/lib/supabase-server";
 import type { SignupBody, User } from "@/types";
+
+const MIN_PASSWORD_LENGTH = 6;
 
 export async function POST(request: Request) {
   try {
@@ -12,10 +15,19 @@ export async function POST(request: Request) {
     }
 
     if (!body.username?.trim()) {
-      return jsonError("Username is required");
+      return jsonError("Username is required", 400);
+    }
+
+    if (!body.password || body.password.length < MIN_PASSWORD_LENGTH) {
+      return jsonError(
+        `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+        400,
+      );
     }
 
     const username = body.username.trim();
+    const password = body.password;
+    const email = usernameToEmail(username);
     const admin = createServerClient();
 
     const { data: existing, error: existingLookupError } = await admin
@@ -32,16 +44,19 @@ export async function POST(request: Request) {
       return jsonError("An account with this username already exists.");
     }
 
-    const anon = createAnonClient();
-    const { data: authData, error: authError } = await anon.auth.signInAnonymously({
-      options: { data: { username } },
-    });
+    const { data: authData, error: authError } =
+      await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { username },
+      });
 
     if (authError) {
       return jsonError(authError.message, 500);
     }
 
-    if (!authData.user?.id || !authData.session?.access_token) {
+    if (!authData.user?.id) {
       return jsonError("Signup failed", 500);
     }
 
@@ -57,12 +72,35 @@ export async function POST(request: Request) {
       return jsonError(profileError.message, 500);
     }
 
+    const anon = createAnonClient();
+    const { data: sessionData, error: signInError } =
+      await anon.auth.signInWithPassword({ email, password });
+
+    if (signInError || !sessionData.session?.access_token) {
+      await admin.auth.admin.deleteUser(userId).catch(() => undefined);
+      const { error: deleteProfileError } = await admin
+        .from("users")
+        .delete()
+        .eq("id", userId);
+      if (deleteProfileError) {
+        console.error("Failed to rollback user profile:", deleteProfileError.message);
+      }
+      return jsonError("Signup failed", 500);
+    }
+
     const user: User = {
       id: userId,
       username,
     };
 
-    return jsonOk({ user, token: authData.session.access_token }, 201);
+    return jsonOk(
+      {
+        user,
+        token: sessionData.session.access_token,
+        refreshToken: sessionData.session.refresh_token,
+      },
+      201,
+    );
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "An unexpected error occurred";

@@ -1,6 +1,8 @@
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { Sidebar } from "@/components/layout/Sidebar";
 
+// RequireAuth defers sessionStorage checks until after mount (hydration-safe).
+
 export default function MainLayout({
   children,
 }: {
