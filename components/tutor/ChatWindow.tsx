@@ -19,10 +19,11 @@ export function ChatWindow({ onSend }: ChatWindowProps) {
     e.preventDefault();
     if (!input.trim() || loading) return;
 
+    const content = input.trim();
     const userMsg: TutorMessage = {
       id: `u-${Date.now()}`,
       role: "user",
-      content: input.trim(),
+      content,
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -30,8 +31,21 @@ export function ChatWindow({ onSend }: ChatWindowProps) {
     setLoading(true);
 
     try {
-      const reply = await onSend(userMsg.content);
+      const reply = await onSend(content);
       setMessages((prev) => [...prev, reply]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          role: "assistant",
+          content:
+            err instanceof Error
+              ? err.message
+              : "Failed to send message. Please try again.",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -51,7 +65,9 @@ export function ChatWindow({ onSend }: ChatWindowProps) {
               className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                 msg.role === "user"
                   ? "ml-auto bg-indigo-600 text-white"
-                  : "bg-zinc-800 text-zinc-200"
+                  : msg.id.startsWith("err-")
+                    ? "bg-red-900/40 text-red-200"
+                    : "bg-zinc-800 text-zinc-200"
               }`}
             >
               {msg.content}

@@ -14,13 +14,22 @@ export default function UploadPage() {
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    apiFetch<Subject[]>("/api/subjects").then((data) => {
-      setSubjects(data);
-      if (data[0]) setSubjectId(data[0].id);
-    });
+    async function loadSubjects() {
+      try {
+        const data = await apiFetch<Subject[]>("/api/subjects");
+        setSubjects(data);
+        if (data[0]) setSubjectId(data[0].id);
+      } catch (err) {
+        setLoadError(
+          err instanceof Error ? err.message : "Failed to load subjects",
+        );
+      }
+    }
+    void loadSubjects();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -39,7 +48,9 @@ export default function UploadPage() {
         method: "POST",
         body: formData,
       });
-      setMessage(`Uploaded "${material.title}" (${material.extractedText.length} chars extracted)`);
+      setMessage(
+        `Uploaded "${material.title}" (${material.extractedText.length} chars extracted)`,
+      );
       setTitle("");
       setFile(null);
     } catch (err) {
@@ -54,6 +65,9 @@ export default function UploadPage() {
       <TopBar title="Upload" />
       <div className="mx-auto max-w-lg p-6">
         <Card title="Upload study material">
+          {loadError ? (
+            <p className="mb-4 text-sm text-red-400">{loadError}</p>
+          ) : null}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-1.5 block text-sm text-zinc-400">

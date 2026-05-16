@@ -10,15 +10,21 @@ import type { WeeklySchedule } from "@/types";
 export default function PlannerPage() {
   const [schedule, setSchedule] = useState<WeeklySchedule | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function generateSchedule() {
     setLoading(true);
+    setError(null);
     try {
       const data = await apiFetch<WeeklySchedule>("/api/ai/planner", {
         method: "POST",
         body: JSON.stringify({}),
       });
       setSchedule(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate schedule",
+      );
     } finally {
       setLoading(false);
     }
@@ -31,6 +37,7 @@ export default function PlannerPage() {
         <Button onClick={generateSchedule} disabled={loading}>
           {loading ? "Generating..." : "Generate weekly schedule"}
         </Button>
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
         {schedule ? <ScheduleGrid schedule={schedule} /> : null}
       </div>
     </>

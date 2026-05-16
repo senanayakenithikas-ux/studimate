@@ -14,10 +14,12 @@ export default function OnboardingPage() {
   const [examDate, setExamDate] = useState("");
   const [confidence, setConfidence] = useState(3);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       await apiFetch("/api/profile", {
         method: "PATCH",
@@ -28,6 +30,10 @@ export default function OnboardingPage() {
         body: JSON.stringify({ name: subjectName, examDate, confidence }),
       });
       router.push("/dashboard");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to save onboarding",
+      );
     } finally {
       setLoading(false);
     }
@@ -66,6 +72,7 @@ export default function OnboardingPage() {
               />
               <p className="text-sm text-zinc-500">Level {confidence}</p>
             </div>
+            {error ? <p className="text-sm text-red-400">{error}</p> : null}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Saving..." : "Continue to dashboard"}
             </Button>
