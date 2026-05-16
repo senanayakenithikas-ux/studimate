@@ -1,3 +1,4 @@
+// public.users has no onboarding column — mock responses until schema adds one.
 import { jsonError, jsonOk, requireAuth } from "@/lib/api";
 import { MOCK_PROFILE } from "@/lib/mock-data";
 import type { Profile } from "@/types";
