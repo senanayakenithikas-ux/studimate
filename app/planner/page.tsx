@@ -214,13 +214,13 @@ export default function PlannerPage() {
     setCurrentWeekStart(newStart);
   };
 
-  async function fetchSchedule() {
+  async function fetchSchedule(regenerate = false) {
     setIsGenerating(true);
     setError(null);
     try {
       const data = await apiFetch<WeeklySchedule>("/api/ai/planner", {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify(regenerate ? { regenerate: true } : {}),
       });
       setSchedule(weeklyScheduleToDaySchedule(data));
       setHasSchedule(true);
@@ -234,11 +234,11 @@ export default function PlannerPage() {
   }
 
   const handleGenerateSchedule = () => {
-    void fetchSchedule();
+    void fetchSchedule(false);
   };
 
   const handleRegenerateSchedule = () => {
-    void fetchSchedule();
+    void fetchSchedule(true);
   };
 
   const toggleSession = (dayIndex: number, sessionId: number) => {

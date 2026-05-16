@@ -9,13 +9,9 @@ import { SubjectCard } from "@/components/dashboard/SubjectCard";
 import { TodayPlan } from "@/components/dashboard/TodayPlan";
 import { CardSkeleton } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
-import {
-  mockUser,
-  mockTodaySessions,
-  type Session,
-} from "@/lib/mock-data";
+import { mockTodaySessions, type Session } from "@/lib/mock-data";
 import { apiFetch } from "@/lib/client-fetch";
-import type { Streak, Subject as ApiSubject } from "@/types";
+import type { Subject as ApiSubject, UserSyncResult } from "@/types";
 import { Calendar, Brain, MessageSquare, Sparkles, Plus } from "lucide-react";
 import {
   Dialog,
@@ -77,8 +73,7 @@ function QuickActions() {
 const subjectColors = ["indigo", "violet", "emerald", "amber", "rose", "cyan"] as const;
 
 type DashboardSubject = {
-  id: number;
-  apiId: string;
+  id: string;
   name: string;
   examDate: string;
   confidence: number;
@@ -99,7 +94,7 @@ function DashboardContent() {
   const { displayName } = useUserProfile();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [streak, setStreak] = useState(mockUser.streak);
+  const [streak, setStreak] = useState(0);
   const [subjects, setSubjects] = useState<DashboardSubject[]>([]);
   const [todaySessions, setTodaySessions] = useState<Session[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -114,15 +109,14 @@ function DashboardContent() {
     async function load() {
       setError(null);
       try {
-        const [streakData, subjectsData] = await Promise.all([
-          apiFetch<Streak>("/api/streaks"),
+        const [syncData, subjectsData] = await Promise.all([
+          apiFetch<UserSyncResult>("/api/users/sync", { method: "POST" }),
           apiFetch<ApiSubject[]>("/api/subjects"),
         ]);
-        setStreak(streakData.current);
+        setStreak(syncData.streak_count);
         setSubjects(
           subjectsData.map((s, i) => ({
-            id: i + 1,
-            apiId: s.id,
+            id: s.id,
             name: s.name,
             examDate: s.examDate,
             confidence: s.confidence,
@@ -175,8 +169,7 @@ function DashboardContent() {
       setSubjects((prev) => [
         ...prev,
         {
-          id: prev.length + 1,
-          apiId: created.id,
+          id: created.id,
           name: created.name,
           examDate: created.examDate,
           confidence: created.confidence,

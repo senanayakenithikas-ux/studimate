@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/loading-spinner";
+import { setAppSession } from "@/lib/app-tab-session";
 import { isValidUsername, usernameToEmail } from "@/lib/auth-credentials";
 import { createClient } from "@/lib/supabase/client";
 import { Eye, EyeOff } from "lucide-react";
@@ -43,6 +44,14 @@ export default function LoginPage() {
       if (authError) {
         setError("Invalid credentials");
         return;
+      }
+
+      setAppSession();
+
+      try {
+        await fetch("/api/users/sync", { method: "POST" });
+      } catch {
+        // Non-blocking: still allow dashboard access if sync fails
       }
 
       router.push("/dashboard");

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/loading-spinner";
+import { setAppSession } from "@/lib/app-tab-session";
 import {
   isValidUsername,
   normalizeUsername,
@@ -51,7 +52,7 @@ export default function SignupPage() {
     try {
       const supabase = createClient();
       const normalized = normalizeUsername(username);
-      const { error: authError } = await supabase.auth.signUp({
+      const { data: signUpData, error: authError } = await supabase.auth.signUp({
         email: usernameToEmail(normalized),
         password,
         options: {
@@ -68,6 +69,13 @@ export default function SignupPage() {
         return;
       }
 
+      if (!signUpData.session) {
+        setError(
+          "Account created. Check your email to confirm, then sign in.",
+        );
+        return;
+      }
+
       const syncRes = await fetch("/api/users/sync", { method: "POST" });
       if (!syncRes.ok) {
         const body = (await syncRes.json()) as { error?: string };
@@ -75,7 +83,9 @@ export default function SignupPage() {
         return;
       }
 
-      router.push("/onboarding");
+      setAppSession();
+
+      router.push("/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");

@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
+import { clearAppSession } from "@/lib/app-tab-session";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 interface SignOutButtonProps {
   className?: string;
+  /** When set, renders a labeled button instead of icon-only. */
+  label?: string;
 }
 
-export function SignOutButton({ className }: SignOutButtonProps) {
+export function SignOutButton({ className, label }: SignOutButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -19,11 +22,28 @@ export function SignOutButton({ className }: SignOutButtonProps) {
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
+      clearAppSession();
       router.push("/login");
       router.refresh();
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (label) {
+    return (
+      <button
+        type="button"
+        onClick={() => void handleSignOut()}
+        disabled={isLoading}
+        className={cn(
+          "text-sm font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50",
+          className,
+        )}
+      >
+        {isLoading ? "Signing out…" : label}
+      </button>
+    );
   }
 
   return (

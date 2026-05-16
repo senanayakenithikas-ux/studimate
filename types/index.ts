@@ -3,6 +3,12 @@ export interface User {
   username: string;
 }
 
+export interface UserSyncResult {
+  id: string;
+  username: string;
+  streak_count: number;
+}
+
 export interface Profile {
   id: string;
   username: string;
@@ -21,6 +27,7 @@ export interface Material {
   id: string;
   subjectId: string;
   title: string;
+  storageUrl: string;
   extractedText: string;
   createdAt: string;
 }

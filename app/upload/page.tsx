@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,20 +12,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { type Material } from "@/lib/mock-data";
 import { apiFetch } from "@/lib/client-fetch";
-import type { Subject } from "@/types";
+import type { Material, Subject } from "@/types";
 import { Upload, FileText, X, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface UploadedMaterialRow {
+interface UploadListItem {
   id: string;
-  filename: string;
-  extracted_text: string;
+  name: string;
+  size: string;
+  subject: string;
+  uploadedAt: string;
 }
 
-export default function UploadPage() {
-  const [materials, setMaterials] = useState<Material[]>([]);
+function UploadPageContent() {
+  const searchParams = useSearchParams();
+  const querySubjectId = searchParams.get("subject_id");
+
+  const [materials, setMaterials] = useState<UploadListItem[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [subjectId, setSubjectId] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -36,7 +42,11 @@ export default function UploadPage() {
       try {
         const data = await apiFetch<Subject[]>("/api/subjects");
         setSubjects(data);
-        if (data[0]) setSubjectId(data[0].id);
+        if (querySubjectId && data.some((s) => s.id === querySubjectId)) {
+          setSubjectId(querySubjectId);
+        } else if (data[0]) {
+          setSubjectId(data[0].id);
+        }
       } catch (err) {
         setLoadError(
           err instanceof Error ? err.message : "Failed to load subjects",
@@ -44,7 +54,7 @@ export default function UploadPage() {
       }
     }
     void loadSubjects();
-  }, []);
+  }, [querySubjectId]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -86,15 +96,15 @@ export default function UploadPage() {
     formData.append("file", file);
 
     try {
-      const row = await apiFetch<UploadedMaterialRow>(
-        "/api/materials/upload",
-        { method: "POST", body: formData },
-      );
+      const row = await apiFetch<Material>("/api/materials/upload", {
+        method: "POST",
+        body: formData,
+      });
       const subjectName =
         subjects.find((s) => s.id === subjectId)?.name ?? "Subject";
-      const newMaterial: Material = {
-        id: Date.now(),
-        name: row.filename,
+      const newMaterial: UploadListItem = {
+        id: row.id,
+        name: row.title,
         size: formatFileSize(file.size),
         subject: subjectName,
         uploadedAt: new Date().toISOString().split("T")[0],
@@ -107,13 +117,13 @@ export default function UploadPage() {
     }
   };
 
-  const handleRemoveMaterial = (id: number) => {
+  const handleRemoveMaterial = (id: string) => {
     setMaterials((prev) => prev.filter((m) => m.id !== id));
   };
 
-  const handleUpdateSubject = (id: number, subject: string) => {
+  const handleUpdateSubject = (id: string, subject: string) => {
     setMaterials((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, subject } : m))
+      prev.map((m) => (m.id === id ? { ...m, subject } : m)),
     );
   };
 
@@ -125,11 +135,10 @@ export default function UploadPage() {
 
   return (
     <AppLayout>
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Upload Materials</h1>
         <p className="text-muted-foreground">
-          Upload your study materials for AI-powered learning
+          Upload PDF study materials for AI-powered learning
         </p>
       </div>
 
@@ -138,6 +147,18 @@ export default function UploadPage() {
       ) : null}
       {uploadError ? (
         <p className="mb-4 text-sm text-destructive">{uploadError}</p>
+      ) : null}
+
+      {querySubjectId && subjectId === querySubjectId ? (
+        <p className="mb-4 text-sm text-muted-foreground">
+          Uploading to selected subject.{" "}
+          <Link
+            href={`/subjects/${querySubjectId}`}
+            className="text-indigo-400 hover:underline"
+          >
+            Back to subject
+          </Link>
+        </p>
       ) : null}
 
       {subjects.length > 0 ? (
@@ -159,7 +180,6 @@ export default function UploadPage() {
         </div>
       ) : null}
 
-      {/* Upload Zone */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -168,27 +188,25 @@ export default function UploadPage() {
           "border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 mb-8",
           isDragging
             ? "border-indigo-500 bg-indigo-500/10"
-            : "border-border hover:border-indigo-500/50"
+            : "border-border hover:border-indigo-500/50",
         )}
       >
         <div className="flex flex-col items-center">
           <div
             className={cn(
               "w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors",
-              isDragging ? "bg-indigo-500/20" : "bg-secondary"
+              isDragging ? "bg-indigo-500/20" : "bg-secondary",
             )}
           >
             <Upload
               className={cn(
                 "w-8 h-8 transition-colors",
-                isDragging ? "text-indigo-400" : "text-muted-foreground"
+                isDragging ? "text-indigo-400" : "text-muted-foreground",
               )}
             />
           </div>
           <p className="text-foreground font-medium mb-2">
-            {isDragging
-              ? "Drop your file here"
-              : "Drop your PDF or text file here"}
+            Drop your PDF here
           </p>
           <p className="text-sm text-muted-foreground mb-4">
             or browse to upload
@@ -210,7 +228,6 @@ export default function UploadPage() {
         </div>
       </div>
 
-      {/* Uploading State */}
       {uploadingFile && (
         <div className="bg-card rounded-xl border border-border p-4 mb-6 animate-pulse">
           <div className="flex items-center gap-4">
@@ -226,7 +243,6 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* Materials List */}
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-4">
           Your Materials
@@ -235,9 +251,7 @@ export default function UploadPage() {
         {materials.length === 0 ? (
           <div className="text-center py-12 bg-card rounded-xl border border-border">
             <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-foreground font-medium mb-2">
-              No materials yet
-            </p>
+            <p className="text-foreground font-medium mb-2">No materials yet</p>
             <p className="text-sm text-muted-foreground">
               Upload your first study material to get started
             </p>
@@ -297,5 +311,13 @@ export default function UploadPage() {
         )}
       </div>
     </AppLayout>
+  );
+}
+
+export default function UploadPage() {
+  return (
+    <Suspense fallback={null}>
+      <UploadPageContent />
+    </Suspense>
   );
 }

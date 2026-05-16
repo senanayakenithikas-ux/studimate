@@ -1,16 +1,33 @@
-import { jsonError, jsonOk } from "@/lib/api";
+import { jsonError, jsonOk, getBearerToken } from "@/lib/api";
 import { displayNameFromAuthUser } from "@/lib/auth-credentials";
+import { syncUserStreak } from "@/lib/user-streak-sync";
 import { createServerClient } from "@/lib/supabase-server";
 import { createClient } from "@/lib/supabase/server";
+import type { User } from "@supabase/supabase-js";
 
-export async function POST() {
+async function resolveAuthUser(request: Request): Promise<User | null> {
+  const admin = createServerClient();
+  const bearer = getBearerToken(request);
+
+  if (bearer) {
+    const {
+      data: { user },
+    } = await admin.auth.getUser(bearer);
+    if (user) return user;
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
-    error: authError,
   } = await supabase.auth.getUser();
 
-  if (authError || !user) {
+  return user;
+}
+
+export async function POST(request: Request) {
+  const user = await resolveAuthUser(request);
+
+  if (!user) {
     return jsonError("Unauthorized", 401);
   }
 
@@ -21,6 +38,7 @@ export async function POST() {
     ) || `user_${user.id.slice(0, 8)}`;
 
   const admin = createServerClient();
+
   const { error: upsertError } = await admin.from("users").upsert(
     {
       id: user.id,
@@ -33,5 +51,14 @@ export async function POST() {
     return jsonError(upsertError.message, 500);
   }
 
-  return jsonOk({ id: user.id, username });
+  const { streakCount, error: streakError } = await syncUserStreak(
+    admin,
+    user.id,
+  );
+
+  if (streakError) {
+    return jsonError(streakError, 500);
+  }
+
+  return jsonOk({ id: user.id, username, streak_count: streakCount });
 }

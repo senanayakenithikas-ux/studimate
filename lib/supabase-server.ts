@@ -60,3 +60,13 @@ export async function resolveUserIdFromToken(
 
   return profile?.id ?? null;
 }
+
+/** Server client + user id from Bearer token (service role bypasses RLS when configured). */
+export async function getAuthedSupabase(
+  token: string,
+): Promise<{ supabase: SupabaseClient; userId: string } | null> {
+  const supabase = createServerClient();
+  const userId = await resolveUserIdFromToken(supabase, token);
+  if (!userId) return null;
+  return { supabase, userId };
+}

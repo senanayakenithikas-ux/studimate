@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronRight } from "lucide-react";
 
 interface SubjectCardProps {
-  id: number;
+  id: string;
   name: string;
   examDate: string;
   confidence: number;

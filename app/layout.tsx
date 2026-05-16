@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { TabSessionManager } from "@/components/auth/TabSessionManager";
 import "./globals.css";
 
 const inter = Inter({
@@ -53,6 +54,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${geistMono.variable} font-sans antialiased min-h-screen`}
       >
+        <TabSessionManager />
         {children}
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>

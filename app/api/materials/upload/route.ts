@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { jsonError, jsonOk, requireAuth } from "@/lib/api";
-import { extractTextFromPdf } from "@/lib/pdf-parse";
-import {
-  createServerClient,
-  resolveUserIdFromToken,
-} from "@/lib/supabase-server";
+import { rowToMaterial } from "@/lib/materials";
+import { getAuthedSupabase } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -26,12 +23,12 @@ export async function POST(request: Request) {
     return jsonError("Unauthorized", 401);
   }
 
-  const supabase = createServerClient();
-  const userId = await resolveUserIdFromToken(supabase, token);
-
-  if (!userId) {
+  const ctx = await getAuthedSupabase(token);
+  if (!ctx) {
     return jsonError("Unauthorized", 401);
   }
+
+  const { supabase, userId } = ctx;
 
   const formData = await request.formData();
   const file = formData.get("file");
@@ -51,15 +48,22 @@ export async function POST(request: Request) {
     return jsonError("Only PDF files are supported");
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const { data: subject, error: subjectError } = await supabase
+    .from("subjects")
+    .select("id")
+    .eq("id", subjectId)
+    .eq("user_id", userId)
+    .maybeSingle();
 
-  let extractedText: string;
-  try {
-    extractedText = await extractTextFromPdf(buffer);
-  } catch {
-    return jsonError("Failed to parse PDF", 400);
+  if (subjectError) {
+    return jsonError(subjectError.message, 500);
   }
 
+  if (!subject) {
+    return jsonError("Subject not found", 404);
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
   const objectPath = `${userId}/${randomUUID()}-${sanitizeFilename(file.name)}`;
 
   const { error: uploadError } = await supabase.storage
@@ -84,14 +88,14 @@ export async function POST(request: Request) {
       subject_id: subjectId,
       filename: file.name,
       storage_url: publicUrl,
-      extracted_text: extractedText,
+      extracted_text: "",
     })
-    .select()
+    .select("id, user_id, subject_id, filename, storage_url, extracted_text")
     .single();
 
   if (insertError) {
     return jsonError(insertError.message, 500);
   }
 
-  return jsonOk(data, 201);
+  return jsonOk(rowToMaterial(data), 201);
 }

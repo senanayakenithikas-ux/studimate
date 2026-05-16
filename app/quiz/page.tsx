@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppLayout } from "@/components/app-layout";
 import { EmptyQuiz } from "@/components/empty-state";
@@ -8,9 +8,8 @@ import { LoadingSpinner } from "@/components/loading-spinner";
 import { QuestionCard } from "@/components/quiz/QuestionCard";
 import { ResultsView } from "@/components/quiz/ResultsView";
 import { Button } from "@/components/ui/button";
-import { mockMaterials } from "@/lib/mock-data";
 import { apiFetch } from "@/lib/client-fetch";
-import type { QuizQuestion } from "@/types";
+import type { Material, QuizQuestion, Subject } from "@/types";
 import { FileText, Upload, Check, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +20,19 @@ interface QuizAnswerResult {
   correct: boolean;
 }
 
+interface QuizMaterialItem {
+  id: string;
+  name: string;
+  size: string;
+  subject: string;
+  uploadedAt: string;
+}
+
 export default function QuizPage() {
   const [step, setStep] = useState<QuizStep>("select");
-  const [selectedMaterial, setSelectedMaterial] = useState<number | null>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null);
+  const [materials, setMaterials] = useState<QuizMaterialItem[]>([]);
+  const [materialsLoading, setMaterialsLoading] = useState(true);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -32,6 +41,44 @@ export default function QuizPage() {
   const [error, setError] = useState<string | null>(null);
 
   const question = questions[currentQuestion];
+
+  useEffect(() => {
+    async function loadMaterials() {
+      setMaterialsLoading(true);
+      setError(null);
+      try {
+        const [subjects, allMaterials] = await Promise.all([
+          apiFetch<Subject[]>("/api/subjects"),
+          apiFetch<Material[]>("/api/materials?all=true"),
+        ]);
+
+        const subjectNameById = new Map(
+          subjects.map((s) => [s.id, s.name] as const),
+        );
+
+        setMaterials(
+          allMaterials.map((m) => ({
+            id: m.id,
+            name: m.title,
+            size: "—",
+            subject: subjectNameById.get(m.subjectId) ?? "Subject",
+            uploadedAt: m.createdAt
+              ? m.createdAt.slice(0, 10)
+              : new Date().toISOString().slice(0, 10),
+          })),
+        );
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load study materials",
+        );
+        setMaterials([]);
+      } finally {
+        setMaterialsLoading(false);
+      }
+    }
+
+    void loadMaterials();
+  }, []);
 
   const handleStartQuiz = async () => {
     if (!selectedMaterial) return;
@@ -42,11 +89,11 @@ export default function QuizPage() {
     setSelectedAnswer(null);
     setShowExplanation(false);
     try {
-      const data = await apiFetch<{ questions: QuizQuestion[] }>(
+      const data = await apiFetch<{ questions: QuizQuestion[]; quiz_id?: string }>(
         "/api/ai/quiz",
         {
           method: "POST",
-          body: JSON.stringify({ materialId: `mat-${selectedMaterial}` }),
+          body: JSON.stringify({ materialId: selectedMaterial }),
         },
       );
       setQuestions(data.questions);
@@ -111,20 +158,22 @@ export default function QuizPage() {
           Test your knowledge with AI-generated questions
         </p>
       </div>
-
-      {/* Step 1: Select Material */}
       {step === "select" && (
         <div className="max-w-2xl mx-auto">
           <h2 className="text-lg font-semibold text-foreground mb-4">
             Select study material
           </h2>
 
-          {mockMaterials.length === 0 ? (
+          {materialsLoading ? (
+            <div className="flex justify-center py-12">
+              <LoadingSpinner size="md" text="Loading materials..." />
+            </div>
+          ) : materials.length === 0 ? (
             <EmptyQuiz onStart={() => {}} />
           ) : (
             <>
               <div className="space-y-3 mb-6">
-                {mockMaterials.map((material) => (
+                {materials.map((material) => (
                   <button
                     key={material.id}
                     onClick={() => setSelectedMaterial(material.id)}
