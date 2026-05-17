@@ -1,0 +1,136 @@
+From da6ac7133d9184ea05089b87202d0a71ef9f49d2 Mon Sep 17 00:00:00 2001
+From: unknown <sithilyapa717@gmail.com>
+Date: Sun, 17 May 2026 06:34:46 +0530
+Subject: [PATCH] Fix: ensure all UI components and page updates are complete
+
+---
+ components/auth/RequireAuth.tsx            |  2 +-
+ components/ui/{Badge.tsx => badge.tsx}     |  0
+ components/ui/{Button.tsx => button.tsx}   |  0
+ components/ui/{Card.tsx => card.tsx}       |  0
+ components/ui/{Input.tsx => input.tsx}     |  0
+ components/ui/{Spinner.tsx => spinner.tsx} |  0
+ next-env.d.ts                              |  2 +-
+ package.json                               |  2 ++
+ pnpm-lock.yaml                             | 14 ++++++++++++++
+ 9 files changed, 18 insertions(+), 2 deletions(-)
+ rename components/ui/{Badge.tsx => badge.tsx} (100%)
+ rename components/ui/{Button.tsx => button.tsx} (100%)
+ rename components/ui/{Card.tsx => card.tsx} (100%)
+ rename components/ui/{Input.tsx => input.tsx} (100%)
+ rename components/ui/{Spinner.tsx => spinner.tsx} (100%)
+
+diff --git a/components/auth/RequireAuth.tsx b/components/auth/RequireAuth.tsx
+index cb7ca6e..8d3e417 100644
+--- a/components/auth/RequireAuth.tsx
++++ b/components/auth/RequireAuth.tsx
+@@ -3,7 +3,7 @@
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+ import { isAuthenticated } from "@/lib/auth";
+-import { Spinner } from "@/components/ui/Spinner";
++import { Spinner } from "@/components/ui/spinner";
+ 
+ function AuthLoadingShell() {
+   return (
+diff --git a/components/ui/Badge.tsx b/components/ui/badge.tsx
+similarity index 100%
+rename from components/ui/Badge.tsx
+rename to components/ui/badge.tsx
+diff --git a/components/ui/Button.tsx b/components/ui/button.tsx
+similarity index 100%
+rename from components/ui/Button.tsx
+rename to components/ui/button.tsx
+diff --git a/components/ui/Card.tsx b/components/ui/card.tsx
+similarity index 100%
+rename from components/ui/Card.tsx
+rename to components/ui/card.tsx
+diff --git a/components/ui/Input.tsx b/components/ui/input.tsx
+similarity index 100%
+rename from components/ui/Input.tsx
+rename to components/ui/input.tsx
+diff --git a/components/ui/Spinner.tsx b/components/ui/spinner.tsx
+similarity index 100%
+rename from components/ui/Spinner.tsx
+rename to components/ui/spinner.tsx
+diff --git a/next-env.d.ts b/next-env.d.ts
+index c4b7818..9edff1c 100644
+--- a/next-env.d.ts
++++ b/next-env.d.ts
+@@ -1,6 +1,6 @@
+ /// <reference types="next" />
+ /// <reference types="next/image-types/global" />
+-import "./.next/dev/types/routes.d.ts";
++import "./.next/types/routes.d.ts";
+ 
+ // NOTE: This file should not be edited
+ // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+diff --git a/package.json b/package.json
+index 002d769..8fd2455 100644
+--- a/package.json
++++ b/package.json
+@@ -46,6 +46,7 @@
+     "class-variance-authority": "^0.7.1",
+     "clsx": "^2.1.1",
+     "cmdk": "1.1.1",
++    "cookie": "^1.1.1",
+     "date-fns": "4.1.0",
+     "embla-carousel-react": "8.6.0",
+     "input-otp": "1.4.2",
+@@ -66,6 +67,7 @@
+   },
+   "devDependencies": {
+     "@tailwindcss/postcss": "^4.2.0",
++    "@types/cookie": "^1.0.0",
+     "@types/node": "^22",
+     "@types/pdf-parse": "^1.1.5",
+     "@types/react": "^19",
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index f8a6963..885a8f6 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -113,6 +113,9 @@ importers:
+       cmdk:
+         specifier: 1.1.1
+         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
++      cookie:
++        specifier: ^1.1.1
++        version: 1.1.1
+       date-fns:
+         specifier: 4.1.0
+         version: 4.1.0
+@@ -168,6 +171,9 @@ importers:
+       '@tailwindcss/postcss':
+         specifier: ^4.2.0
+         version: 4.3.0
++      '@types/cookie':
++        specifier: ^1.0.0
++        version: 1.0.0
+       '@types/node':
+         specifier: ^22
+         version: 22.19.19
+@@ -1305,6 +1311,10 @@ packages:
+   '@tailwindcss/postcss@4.3.0':
+     resolution: {integrity: sha512-Jm05Tjx+9yCLGv5qw1c+84Psds8MnyrEQYCB+FFk2lgGiUjlRqdxke4mVTuYrj2xnVZqKim2Apr5ySuQRYAw/w==}
+ 
++  '@types/cookie@1.0.0':
++    resolution: {integrity: sha512-mGFXbkDQJ6kAXByHS7QAggRXgols0mAdP4MuXgloGY1tXokvzaFFM4SMqWvf7AH0oafI7zlFJwoGWzmhDqTZ9w==}
++    deprecated: This is a stub types definition. cookie provides its own type definitions, so you do not need this installed.
++
+   '@types/d3-array@3.2.2':
+     resolution: {integrity: sha512-hOLWVbm7uRza0BYXpIIW5pxfrKe0W+D5lrFiAEYR+pb6w3N2SwSMaJbXdUfSEv+dT4MfHBLtn5js0LAWaO6otw==}
+ 
+@@ -2912,6 +2922,10 @@ snapshots:
+       postcss: 8.5.14
+       tailwindcss: 4.3.0
+ 
++  '@types/cookie@1.0.0':
++    dependencies:
++      cookie: 1.1.1
++
+   '@types/d3-array@3.2.2': {}
+ 
+   '@types/d3-color@3.1.3': {}
+-- 
+2.54.0.windows.1
+
