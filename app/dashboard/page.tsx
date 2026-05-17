@@ -97,6 +97,9 @@ function DashboardContent() {
   const [subjects, setSubjects] = useState<DashboardSubject[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddingSubject, setIsAddingSubject] = useState(false);
+  const [removingSubjectId, setRemovingSubjectId] = useState<string | null>(
+    null,
+  );
   const [newSubject, setNewSubject] = useState({
     name: "",
     examDate: "",
@@ -173,6 +176,23 @@ function DashboardContent() {
   const handleAddDialogOpenChange = (open: boolean) => {
     if (!open && isAddingSubject) return;
     setIsAddDialogOpen(open);
+  };
+
+  const handleRemoveSubject = async (id: string) => {
+    if (removingSubjectId) return;
+
+    setRemovingSubjectId(id);
+    setError(null);
+    try {
+      await apiFetch<{ id: string }>(`/api/subjects/${id}`, {
+        method: "DELETE",
+      });
+      setSubjects((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove subject");
+    } finally {
+      setRemovingSubjectId(null);
+    }
   };
 
   // Get greeting based on time
@@ -355,6 +375,8 @@ function DashboardContent() {
                   confidence={subject.confidence}
                   progress={subject.progress}
                   color={subject.color as "indigo" | "violet" | "emerald"}
+                  onRemove={(subjectId) => void handleRemoveSubject(subjectId)}
+                  isRemoving={removingSubjectId === subject.id}
                 />
               ))}
             </div>

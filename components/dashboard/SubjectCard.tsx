@@ -4,7 +4,8 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/progress-bar";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ChevronRight, Trash2 } from "lucide-react";
 
 interface SubjectCardProps {
   id: string;
@@ -14,6 +15,8 @@ interface SubjectCardProps {
   progress: number;
   color?: "indigo" | "violet" | "emerald";
   className?: string;
+  onRemove?: (id: string) => void;
+  isRemoving?: boolean;
 }
 
 export function SubjectCard({
@@ -24,6 +27,8 @@ export function SubjectCard({
   progress,
   color = "indigo",
   className,
+  onRemove,
+  isRemoving = false,
 }: SubjectCardProps) {
   const today = new Date();
   const exam = new Date(examDate);
@@ -45,42 +50,61 @@ export function SubjectCard({
   };
 
   return (
-    <Link href={`/subjects/${id}`}>
-      <div
-        className={cn(
-          "group bg-card rounded-xl border border-border p-4 transition-all duration-200 hover:bg-secondary/50 hover:border-primary/30 border-l-4 cursor-pointer",
-          colorStyles[color],
-          className,
-        )}
-      >
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors">
-              {name}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {daysLeft > 0 ? `${daysLeft} days left` : "Exam passed"}
-            </p>
+    <div className={cn("relative", className)}>
+      {onRemove ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled={isRemoving}
+          aria-label={`Remove ${name}`}
+          className="absolute top-2 right-2 z-10 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove(id);
+          }}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      ) : null}
+      <Link href={`/subjects/${id}`}>
+        <div
+          className={cn(
+            "group bg-card rounded-xl border border-border p-4 transition-all duration-200 hover:bg-secondary/50 hover:border-primary/30 border-l-4 cursor-pointer",
+            colorStyles[color],
+            onRemove && "pr-12",
+          )}
+        >
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors">
+                {name}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {daysLeft > 0 ? `${daysLeft} days left` : "Exam passed"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className={cn("text-xs font-medium", confidenceBadgeColor())}
+              >
+                {confidence}/10
+              </Badge>
+              <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className={cn("text-xs font-medium", confidenceBadgeColor())}
-            >
-              {confidence}/10
-            </Badge>
-            <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="font-medium text-card-foreground">{progress}%</span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium text-card-foreground">{progress}%</span>
+            </div>
+            <ProgressBar value={progress} color={color} />
           </div>
-          <ProgressBar value={progress} color={color} />
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }

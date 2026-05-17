@@ -153,14 +153,18 @@ export default function OnboardingPage() {
                     <span className="text-sm font-medium text-muted-foreground">
                       Subject {index + 1}
                     </span>
-                    {subjects.length > 1 && (
-                      <button
+                    {subjects.length > 1 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => removeSubject(subject.id)}
-                        className="p-1 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        className="h-8 gap-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       >
                         <X className="w-4 h-4" />
-                      </button>
-                    )}
+                        Remove
+                      </Button>
+                    ) : null}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
