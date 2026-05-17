@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { ScheduleGrid } from "@/components/planner/ScheduleGrid";
 import { EmptySchedule } from "@/components/empty-state";
@@ -15,11 +15,16 @@ import {
 } from "@/lib/planner-client";
 import { updateScheduleTaskCompleted } from "@/lib/today-schedule";
 import {
+  emptyWeekDaySchedule,
   weeklyScheduleToDaySchedule,
   type PlannerDaySchedule,
 } from "@/lib/schedule-map";
 import type { WeeklySchedule } from "@/types";
-import { formatDateString, getMondayOfWeek } from "@/lib/planner-dates";
+import {
+  formatDateString,
+  getMondayOfWeek,
+  getMondayOfWeekString,
+} from "@/lib/planner-dates";
 import { RefreshCw, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
 type DaySchedule = PlannerDaySchedule;
@@ -174,12 +179,14 @@ export default function PlannerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
   const [isLoadingWeek, setIsLoadingWeek] = useState(false);
-  const [hasSchedule, setHasSchedule] = useState(false);
+  /** True once the user has any saved/generated plan (keeps grid visible while browsing weeks). */
+  const [hasPlanner, setHasPlanner] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<DaySchedule[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     getMondayOfWeek(new Date()),
   );
+  const weekCacheRef = useRef<Map<string, DaySchedule[]>>(new Map());
 
   const getWeekLabel = () => {
     const weekEnd = new Date(currentWeekStart);
@@ -196,24 +203,61 @@ export default function PlannerPage() {
     return `${startStr} - ${endStr}`;
   };
 
-  const applyWeeklySchedule = useCallback((data: WeeklySchedule) => {
-    const days = weeklyScheduleToDaySchedule(data);
-    setSchedule(days);
-    setHasSchedule(weeklyScheduleHasSessions(data));
-    if (data.weekStart) {
-      setCurrentWeekStart(parseWeekStartDate(data.weekStart));
-    }
+  const weekKeyFor = useCallback((weekStart: Date) => {
+    return getMondayOfWeekString(formatDateString(weekStart));
   }, []);
+
+  const displayWeek = useCallback((weekStart: Date, days: DaySchedule[]) => {
+    const key = weekKeyFor(weekStart);
+    weekCacheRef.current.set(key, days);
+    setSchedule(days);
+    setCurrentWeekStart(parseWeekStartDate(key));
+  }, [weekKeyFor]);
+
+  const applyWeeklySchedule = useCallback(
+    (data: WeeklySchedule, options?: { replaceCache?: boolean }) => {
+      if (options?.replaceCache) {
+        weekCacheRef.current.clear();
+      }
+
+      if (weeklyScheduleHasSessions(data)) {
+        setHasPlanner(true);
+      }
+
+      const weekMonday = data.weekStart
+        ? getMondayOfWeekString(data.weekStart)
+        : weekKeyFor(new Date());
+      const days = weeklyScheduleToDaySchedule({
+        ...data,
+        weekStart: weekMonday,
+      });
+      weekCacheRef.current.set(weekMonday, days);
+      setSchedule(days);
+      setCurrentWeekStart(parseWeekStartDate(weekMonday));
+    },
+    [weekKeyFor],
+  );
 
   const loadWeekForDate = useCallback(
     async (weekStart: Date) => {
+      const key = weekKeyFor(weekStart);
+      const cached = weekCacheRef.current.get(key);
+      if (cached) {
+        displayWeek(weekStart, cached);
+        return;
+      }
+
       setIsLoadingWeek(true);
       setError(null);
       try {
-        const data = await fetchPlannerScheduleForWeek(
-          formatDateString(weekStart),
-        );
-        applyWeeklySchedule(data);
+        const data = await fetchPlannerScheduleForWeek(key);
+        const days = weeklyScheduleHasSessions(data)
+          ? weeklyScheduleToDaySchedule({ ...data, weekStart: key })
+          : emptyWeekDaySchedule(key);
+        if (weeklyScheduleHasSessions(data)) {
+          setHasPlanner(true);
+        }
+        displayWeek(weekStart, days);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load schedule",
@@ -222,7 +266,7 @@ export default function PlannerPage() {
         setIsLoadingWeek(false);
       }
     },
-    [applyWeeklySchedule],
+    [displayWeek, weekKeyFor],
   );
 
   const loadSavedSchedule = useCallback(async () => {
@@ -235,7 +279,8 @@ export default function PlannerPage() {
       setError(
         err instanceof Error ? err.message : "Failed to load your schedule",
       );
-      setHasSchedule(false);
+      setHasPlanner(false);
+      weekCacheRef.current.clear();
       setSchedule([]);
     } finally {
       setIsLoading(false);
@@ -250,7 +295,7 @@ export default function PlannerPage() {
     const newStart = new Date(currentWeekStart);
     newStart.setDate(currentWeekStart.getDate() - 7);
     setCurrentWeekStart(newStart);
-    if (hasSchedule) {
+    if (hasPlanner) {
       void loadWeekForDate(newStart);
     }
   };
@@ -259,7 +304,7 @@ export default function PlannerPage() {
     const newStart = new Date(currentWeekStart);
     newStart.setDate(currentWeekStart.getDate() + 7);
     setCurrentWeekStart(newStart);
-    if (hasSchedule) {
+    if (hasPlanner) {
       void loadWeekForDate(newStart);
     }
   };
@@ -272,7 +317,7 @@ export default function PlannerPage() {
     setError(null);
     try {
       const data = await fetcher();
-      applyWeeklySchedule(data);
+      applyWeeklySchedule(data, { replaceCache: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : errorMessage);
     } finally {
@@ -302,25 +347,24 @@ export default function PlannerPage() {
     const nextCompleted = !session.completed;
     const snapshot = schedule;
 
-    setSchedule((prev) =>
-      prev.map((d, i) =>
-        i === dayIndex
-          ? {
-              ...d,
-              sessions: d.sessions.map((s) =>
-                s.id === sessionId
-                  ? { ...s, completed: nextCompleted }
-                  : s,
-              ),
-            }
-          : d,
-      ),
+    const nextSchedule = snapshot.map((d, i) =>
+      i === dayIndex
+        ? {
+            ...d,
+            sessions: d.sessions.map((s) =>
+              s.id === sessionId ? { ...s, completed: nextCompleted } : s,
+            ),
+          }
+        : d,
     );
+    setSchedule(nextSchedule);
+    weekCacheRef.current.set(weekKeyFor(currentWeekStart), nextSchedule);
 
     try {
       await updateScheduleTaskCompleted(sessionId, nextCompleted);
     } catch {
       setSchedule(snapshot);
+      weekCacheRef.current.set(weekKeyFor(currentWeekStart), snapshot);
     }
   };
 
@@ -333,7 +377,7 @@ export default function PlannerPage() {
             Your AI-generated weekly study schedule
           </p>
         </div>
-        {hasSchedule && !isLoading && !isBusy && (
+        {hasPlanner && !isLoading && !isBusy && (
           <WeekNavigator
             weekLabel={getWeekLabel()}
             onPrev={goToPrevWeek}
@@ -355,13 +399,13 @@ export default function PlannerPage() {
           <LoadingSpinner
             size="lg"
             text={
-              hasSchedule
+              hasPlanner
                 ? "Updating your schedule..."
                 : "Generating your schedule..."
             }
           />
         </div>
-      ) : !hasSchedule ? (
+      ) : !hasPlanner ? (
         <EmptySchedule onGenerate={handleGenerateSchedule} />
       ) : (
         <div className="flex flex-col xl:flex-row gap-6">

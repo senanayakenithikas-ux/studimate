@@ -34,6 +34,14 @@ const DAY_NAME_TO_ABBREV: Record<string, string> = {
   Sun: "Sun",
 };
 
+/** Seven-day grid for a calendar week with no sessions. */
+export function emptyWeekDaySchedule(weekStartMonday: string): PlannerDaySchedule[] {
+  return weeklyScheduleToDaySchedule({
+    weekStart: weekStartMonday,
+    slots: [],
+  });
+}
+
 export function weeklyScheduleToDaySchedule(
   weekly: WeeklySchedule,
 ): PlannerDaySchedule[] {
