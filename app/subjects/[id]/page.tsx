@@ -17,6 +17,7 @@ import {
   Brain,
   MessageSquare,
   Download,
+  Trash2,
   Plus,
   BookOpen,
   Target,
@@ -59,9 +60,13 @@ function subjectColor(name: string): ColorKey {
 function MaterialCard({
   material,
   color,
+  onRemove,
+  isRemoving,
 }: {
   material: Material;
   color: ColorKey;
+  onRemove: (id: string) => void;
+  isRemoving: boolean;
 }) {
   const styles = colorStyles[color];
 
@@ -84,7 +89,7 @@ function MaterialCard({
           <p className="font-medium text-foreground truncate">{material.title}</p>
           <p className="text-sm text-muted-foreground mt-1">PDF</p>
         </div>
-        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="icon"
@@ -100,6 +105,17 @@ function MaterialCard({
               <Download className="w-4 h-4" />
             </a>
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={isRemoving}
+            aria-label={`Delete ${material.title}`}
+            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            onClick={() => onRemove(material.id)}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </div>
@@ -114,6 +130,28 @@ export default function SubjectPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [removingMaterialId, setRemovingMaterialId] = useState<string | null>(
+    null,
+  );
+
+  const handleRemoveMaterial = async (materialId: string) => {
+    if (removingMaterialId) return;
+
+    setRemovingMaterialId(materialId);
+    setLoadError(null);
+    try {
+      await apiFetch<{ id: string }>(`/api/materials/${materialId}`, {
+        method: "DELETE",
+      });
+      setMaterials((prev) => prev.filter((m) => m.id !== materialId));
+    } catch (err) {
+      setLoadError(
+        err instanceof Error ? err.message : "Failed to delete material",
+      );
+    } finally {
+      setRemovingMaterialId(null);
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -317,7 +355,13 @@ export default function SubjectPage() {
         ) : (
           <div className="space-y-3">
             {materials.map((material) => (
-              <MaterialCard key={material.id} material={material} color={color} />
+              <MaterialCard
+                key={material.id}
+                material={material}
+                color={color}
+                onRemove={(id) => void handleRemoveMaterial(id)}
+                isRemoving={removingMaterialId === material.id}
+              />
             ))}
           </div>
         )}

@@ -36,6 +36,9 @@ function UploadPageContent() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFile, setUploadingFile] = useState<string | null>(null);
+  const [removingMaterialId, setRemovingMaterialId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     async function loadSubjects() {
@@ -47,6 +50,18 @@ function UploadPageContent() {
         } else if (data[0]) {
           setSubjectId(data[0].id);
         }
+
+        const rows = await apiFetch<Material[]>("/api/materials?all=true");
+        const subjectNameById = new Map(data.map((s) => [s.id, s.name]));
+        setMaterials(
+          rows.map((row) => ({
+            id: row.id,
+            name: row.title,
+            size: "PDF",
+            subject: subjectNameById.get(row.subjectId) ?? "Subject",
+            uploadedAt: row.createdAt || new Date().toISOString().split("T")[0],
+          })),
+        );
       } catch (err) {
         setLoadError(
           err instanceof Error ? err.message : "Failed to load subjects",
@@ -117,8 +132,23 @@ function UploadPageContent() {
     }
   };
 
-  const handleRemoveMaterial = (id: string) => {
-    setMaterials((prev) => prev.filter((m) => m.id !== id));
+  const handleRemoveMaterial = async (id: string) => {
+    if (removingMaterialId) return;
+
+    setRemovingMaterialId(id);
+    setUploadError(null);
+    try {
+      await apiFetch<{ id: string }>(`/api/materials/${id}`, {
+        method: "DELETE",
+      });
+      setMaterials((prev) => prev.filter((m) => m.id !== id));
+    } catch (err) {
+      setUploadError(
+        err instanceof Error ? err.message : "Failed to delete material",
+      );
+    } finally {
+      setRemovingMaterialId(null);
+    }
   };
 
   const handleUpdateSubject = (id: string, subject: string) => {
@@ -298,8 +328,11 @@ function UploadPageContent() {
                     </Select>
 
                     <button
-                      onClick={() => handleRemoveMaterial(material.id)}
-                      className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      type="button"
+                      disabled={removingMaterialId === material.id}
+                      aria-label={`Delete ${material.name}`}
+                      onClick={() => void handleRemoveMaterial(material.id)}
+                      className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
                     >
                       <X className="w-4 h-4" />
                     </button>

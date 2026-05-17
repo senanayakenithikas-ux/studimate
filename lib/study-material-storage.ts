@@ -105,6 +105,82 @@ export async function downloadStudyMaterialText(
   return extracted;
 }
 
+export type DeleteStudyMaterialResult =
+  | { ok: true; id: string }
+  | { ok: false; message: string; status: number };
+
+/** Removes storage object, related quizzes/sessions, and the study_materials row. */
+export async function deleteStudyMaterialById(
+  supabase: SupabaseClient,
+  userId: string,
+  materialId: string,
+): Promise<DeleteStudyMaterialResult> {
+  const { data: row, error: fetchError } = await supabase
+    .from("study_materials")
+    .select("id, user_id, filename, storage_url, extracted_text, file_path")
+    .eq("id", materialId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { ok: false, message: fetchError.message, status: 500 };
+  }
+
+  if (!row) {
+    return { ok: false, message: "Material not found", status: 404 };
+  }
+
+  const storageRow = mapStudyMaterialStorageRow(
+    row as Record<string, unknown>,
+  );
+  const objectPath = resolveStoragePath(storageRow);
+
+  if (objectPath) {
+    const { error: storageError } = await supabase.storage
+      .from(STUDY_MATERIALS_BUCKET)
+      .remove([objectPath]);
+
+    if (storageError) {
+      console.warn(
+        `[deleteStudyMaterial] storage remove failed for ${materialId}:`,
+        storageError.message,
+      );
+    }
+  }
+
+  const { error: quizzesError } = await supabase
+    .from("quizzes")
+    .delete()
+    .eq("material_id", materialId)
+    .eq("user_id", userId);
+
+  if (quizzesError) {
+    return { ok: false, message: quizzesError.message, status: 500 };
+  }
+
+  const { error: sessionsError } = await supabase
+    .from("chat_sessions")
+    .delete()
+    .eq("material_id", materialId)
+    .eq("user_id", userId);
+
+  if (sessionsError) {
+    return { ok: false, message: sessionsError.message, status: 500 };
+  }
+
+  const { error: deleteError } = await supabase
+    .from("study_materials")
+    .delete()
+    .eq("id", materialId)
+    .eq("user_id", userId);
+
+  if (deleteError) {
+    return { ok: false, message: deleteError.message, status: 500 };
+  }
+
+  return { ok: true, id: materialId };
+}
+
 export function mapStudyMaterialStorageRow(
   row: Record<string, unknown>,
 ): StudyMaterialStorageRow {

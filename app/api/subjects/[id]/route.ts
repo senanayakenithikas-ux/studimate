@@ -1,5 +1,6 @@
 import { jsonError, jsonOk, requireAuth } from "@/lib/api";
 import { getAuthedSupabase } from "@/lib/supabase-server";
+import { deleteStudyMaterialById } from "@/lib/study-material-storage";
 
 export async function DELETE(
   request: Request,
@@ -37,14 +38,25 @@ export async function DELETE(
     return jsonError("Subject not found", 404);
   }
 
-  const { error: materialsError } = await supabase
+  const { data: materials, error: materialsListError } = await supabase
     .from("study_materials")
-    .delete()
+    .select("id")
     .eq("subject_id", id)
     .eq("user_id", userId);
 
-  if (materialsError) {
-    return jsonError(materialsError.message, 500);
+  if (materialsListError) {
+    return jsonError(materialsListError.message, 500);
+  }
+
+  for (const material of materials ?? []) {
+    const deleted = await deleteStudyMaterialById(
+      supabase,
+      userId,
+      String(material.id),
+    );
+    if (!deleted.ok) {
+      return jsonError(deleted.message, deleted.status);
+    }
   }
 
   const { error: schedulesError } = await supabase
