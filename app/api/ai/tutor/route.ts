@@ -13,6 +13,7 @@ import {
   resolveStudyMaterialPromptText,
   TUTOR_PROMPT_MAX_CHARS,
 } from "@/lib/study-material-prompt";
+import { runEphemeralVoiceTutorTurn } from "@/lib/tutor-ephemeral-voice";
 import { buildTutorSpeechPayload } from "@/lib/tutor-tts";
 import { getAuthedSupabase } from "@/lib/supabase-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -25,6 +26,11 @@ interface PostTutorBody {
   material_id?: string;
   message?: string;
   include_speech?: boolean;
+  /** Voice bot: spoken replies via MiniMax tutorChat (voice prompt), not text read-aloud. */
+  voice_mode?: boolean;
+  /** Voice bot: in-memory turn only, no chat_sessions write. */
+  ephemeral?: boolean;
+  history?: Message[];
 }
 
 interface ChatSessionRecord {
@@ -125,6 +131,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     const message = body.message?.trim();
     if (!message) {
       return errorResponse("message is required", 400);
+    }
+
+    if (body.voice_mode === true && body.ephemeral === true) {
+      const voiceResult = await runEphemeralVoiceTutorTurn(supabase, userId, {
+        message,
+        materialId: body.material_id,
+        history: body.history,
+      });
+      return jsonOk(voiceResult);
     }
 
     let sessionId: string;

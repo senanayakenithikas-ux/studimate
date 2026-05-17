@@ -9,6 +9,7 @@ import {
   Calendar,
   Brain,
   MessageSquare,
+  Mic,
   Upload,
   Settings,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/planner", label: "Planner", icon: Calendar },
   { href: "/quiz", label: "Quiz", icon: Brain },
   { href: "/tutor", label: "Tutor", icon: MessageSquare },
+  { href: "/tutor/voice", label: "Voice Tutor", icon: Mic },
   { href: "/upload", label: "Upload", icon: Upload },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

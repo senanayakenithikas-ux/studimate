@@ -97,9 +97,10 @@ export interface TutorSpeechFields {
 }
 
 export interface TutorPostResponse extends TutorSpeechFields {
-  sessionId: string;
+  sessionId?: string;
   message: TutorMessage;
   history?: { role: "user" | "assistant"; content: string }[];
+  ephemeral?: boolean;
 }
 
 export interface TutorVoicePostResponse extends TutorSpeechFields {
