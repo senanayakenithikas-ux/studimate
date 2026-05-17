@@ -9,10 +9,12 @@ import { enforceAdaptivePlan } from "@/lib/planner-enforce";
 import {
   buildPlannerContext,
   type PlannerMaterialInput,
+  type PlannerCompletedTaskInput,
   type PlannerMissedTaskInput,
   type PlannerQuizInput,
   type PlannerSubjectInput,
 } from "@/lib/planner-context";
+import { getTodayDateString } from "@/lib/planner-dates";
 import { fetchUserProfile } from "@/lib/users";
 import {
   createPlannerSupabaseClient,
@@ -100,12 +102,14 @@ function scheduleRecordsToWeeklySchedule(
   const weekStart = sorted[0]?.date ?? new Date().toISOString().slice(0, 10);
 
   const slots: PlannerSlot[] = sorted.map((row, index) => ({
+    scheduleId: row.id,
     day: weekdayFromDate(row.date),
     time: `${String(9 + (index % 4)).padStart(2, "0")}:00`,
     subjectId: row.subject_id,
     subjectName: nameById.get(row.subject_id) ?? "Subject",
     topic: row.topics,
     durationMinutes: row.duration_mins,
+    completed: row.completed,
   }));
 
   return { weekStart, slots };
@@ -219,34 +223,106 @@ async function fetchStudyMaterials(
   );
 }
 
+function mapIncompleteScheduleRow(
+  record: Record<string, unknown>,
+): PlannerMissedTaskInput {
+  return {
+    schedule_id: String(record.id),
+    subject_id: String(record.subject_id),
+    date: String(record.date),
+    topics: String(record.topics),
+    session_type: String(record.session_type ?? "Reading"),
+    duration_mins: Number(record.duration_mins ?? 60),
+  };
+}
+
+interface CompletedSchedulePreserve extends PlannerCompletedTaskInput {
+  session_type: string;
+}
+
+function mapCompletedScheduleRow(
+  record: Record<string, unknown>,
+): CompletedSchedulePreserve {
+  return {
+    schedule_id: String(record.id),
+    subject_id: String(record.subject_id),
+    date: String(record.date),
+    topics: String(record.topics),
+    duration_mins: Number(record.duration_mins ?? 60),
+    session_type: String(record.session_type ?? "Study"),
+  };
+}
+
+/** Incomplete tasks through the plan window end (carry-over on regenerate). */
 async function fetchMissedTasks(
   supabase: SupabaseClient,
   userId: string,
-  beforeDate: string,
+  throughDate: string,
 ): Promise<PlannerMissedTaskInput[]> {
   const { data, error } = await supabase
     .from("schedules")
     .select("id, subject_id, date, topics, session_type, duration_mins")
     .eq("user_id", userId)
     .eq("completed", false)
-    .lt("date", beforeDate)
+    .lte("date", throughDate)
     .order("date", { ascending: true });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((row) => {
-    const record = row as Record<string, unknown>;
-    return {
-      schedule_id: String(record.id),
-      subject_id: String(record.subject_id),
-      date: String(record.date),
-      topics: String(record.topics),
-      session_type: String(record.session_type ?? "Reading"),
-      duration_mins: Number(record.duration_mins ?? 60),
-    };
-  });
+  return (data ?? []).map((row) =>
+    mapIncompleteScheduleRow(row as Record<string, unknown>),
+  );
+}
+
+async function fetchCompletedTasksInRange(
+  supabase: SupabaseClient,
+  userId: string,
+  start: string,
+  end: string,
+): Promise<CompletedSchedulePreserve[]> {
+  const { data, error } = await supabase
+    .from("schedules")
+    .select("id, subject_id, date, topics, duration_mins, session_type")
+    .eq("user_id", userId)
+    .eq("completed", true)
+    .gte("date", start)
+    .lte("date", end)
+    .order("date", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) =>
+    mapCompletedScheduleRow(row as Record<string, unknown>),
+  );
+}
+
+function scheduleDedupeKey(
+  date: string,
+  subjectId: string,
+  topics: string,
+): string {
+  return `${date}|${subjectId}|${topics.trim().toLowerCase()}`;
+}
+
+function dedupeGeneratedAgainstCompleted(
+  generated: Schedule[],
+  completed: PlannerCompletedTaskInput[],
+): Schedule[] {
+  const completedKeys = new Set(
+    completed.map((c) =>
+      scheduleDedupeKey(c.date, c.subject_id, c.topics),
+    ),
+  );
+  return generated.filter(
+    (row) =>
+      !completedKeys.has(
+        scheduleDedupeKey(row.date, row.subject_id, row.topics),
+      ),
+  );
 }
 
 async function fetchQuizAudits(
@@ -414,17 +490,25 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const subjectIds = subjects.map((subject) => subject.id);
 
+    const completedInRange = await fetchCompletedTasksInRange(
+      supabase,
+      userId,
+      start,
+      end,
+    );
+
     const [materials, missedTasks, quizAudits] = await Promise.all([
       fetchStudyMaterials(supabase, userId, subjectIds),
-      fetchMissedTasks(supabase, userId, start),
+      fetchMissedTasks(supabase, userId, end),
       fetchQuizAudits(supabase, userId),
     ]);
 
     const plannerContext = buildPlannerContext({
-      today: start,
+      today: getTodayDateString(),
       subjects: subjectsToPlannerInput(subjects),
       materials,
       missedTasks,
+      completedTasks: completedInRange,
       quizzes: quizAudits,
     });
 
@@ -432,6 +516,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       .from("schedules")
       .delete()
       .eq("user_id", userId)
+      .eq("completed", false)
       .gte("date", start)
       .lte("date", end);
 
@@ -440,7 +525,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const llmRows: Schedule[] = await generateStudyPlan(plannerContext);
-    const generated = enforceAdaptivePlan(llmRows, plannerContext);
+    const enforced = enforceAdaptivePlan(llmRows, plannerContext);
+    const generated = dedupeGeneratedAgainstCompleted(
+      enforced,
+      completedInRange,
+    );
 
     const inserts = generated.map((item) => ({
       user_id: userId,
@@ -463,9 +552,22 @@ export async function POST(request: Request): Promise<NextResponse> {
       return errorResponse(insertError.message, 500);
     }
 
-    const records = (savedRows ?? []).map((row: Record<string, unknown>) =>
+    const newRecords = (savedRows ?? []).map((row: Record<string, unknown>) =>
       mapScheduleRow(row),
     );
+    const records = [
+      ...completedInRange.map((c) => ({
+        id: c.schedule_id,
+        user_id: userId,
+        subject_id: c.subject_id,
+        date: c.date,
+        duration_mins: c.duration_mins,
+        topics: c.topics,
+        session_type: c.session_type,
+        completed: true as const,
+      })),
+      ...newRecords,
+    ].sort((a, b) => a.date.localeCompare(b.date));
 
     const streakCount = await syncStreakAfterPlan(userId, true);
 

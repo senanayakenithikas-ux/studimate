@@ -115,20 +115,24 @@ const MOCK_SCHEDULE: WeeklySchedule = {
   weekStart: new Date().toISOString().slice(0, 10),
   slots: [
     {
+      scheduleId: "mock-sch-1",
       day: "Monday",
       time: "09:00",
       subjectId: "sub-1",
       subjectName: "Mathematics",
       topic: "Calculus review",
       durationMinutes: 60,
+      completed: false,
     },
     {
+      scheduleId: "mock-sch-2",
       day: "Wednesday",
       time: "14:00",
       subjectId: "sub-2",
       subjectName: "Physics",
       topic: "Mechanics practice",
       durationMinutes: 45,
+      completed: false,
     },
   ],
 };

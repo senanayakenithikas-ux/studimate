@@ -56,12 +56,14 @@ export interface Streak {
 }
 
 export interface PlannerSlot {
+  scheduleId: string;
   day: string;
   time: string;
   subjectId: string;
   subjectName: string;
   topic: string;
   durationMinutes: number;
+  completed: boolean;
 }
 
 export interface WeeklySchedule {

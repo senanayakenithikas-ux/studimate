@@ -26,6 +26,14 @@ export interface PlannerMissedTaskInput {
   duration_mins: number;
 }
 
+export interface PlannerCompletedTaskInput {
+  schedule_id: string;
+  subject_id: string;
+  date: string;
+  topics: string;
+  duration_mins: number;
+}
+
 export interface PlannerQuizInput {
   quiz_id: string;
   material_id: string;
@@ -61,6 +69,14 @@ export interface PlannerContextMissedTask {
   duration_mins: number;
 }
 
+export interface PlannerContextCompletedTask {
+  schedule_id: string;
+  subject_id: string;
+  date: string;
+  topics: string;
+  duration_mins: number;
+}
+
 export interface PlannerContextPerformanceAudit {
   quiz_id: string;
   material_id: string;
@@ -75,6 +91,7 @@ export interface PlannerContext {
   subjects: PlannerContextSubject[];
   study_materials: PlannerContextMaterial[];
   missed_tasks: PlannerContextMissedTask[];
+  completed_tasks: PlannerContextCompletedTask[];
   performance_audits: PlannerContextPerformanceAudit[];
 }
 
@@ -151,6 +168,7 @@ export function buildPlannerContext(params: {
   subjects: PlannerSubjectInput[];
   materials: PlannerMaterialInput[];
   missedTasks: PlannerMissedTaskInput[];
+  completedTasks?: PlannerCompletedTaskInput[];
   quizzes: PlannerQuizInput[];
 }): PlannerContext {
   const today = params.today ?? todayDateString();
@@ -204,6 +222,13 @@ export function buildPlannerContext(params: {
       date: t.date,
       topics: t.topics,
       session_type: t.session_type,
+      duration_mins: t.duration_mins,
+    })),
+    completed_tasks: (params.completedTasks ?? []).map((t) => ({
+      schedule_id: t.schedule_id,
+      subject_id: t.subject_id,
+      date: t.date,
+      topics: t.topics,
       duration_mins: t.duration_mins,
     })),
     performance_audits,

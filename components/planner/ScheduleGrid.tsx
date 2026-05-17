@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import type { PlannerDaySchedule } from "@/lib/schedule-map";
 
 interface Session {
-  id: number;
+  id: string;
   subject: string;
   topic: string;
   duration: number;
@@ -264,9 +264,9 @@ function TimeGrid({
   onToggleSession,
 }: {
   schedule: DaySchedule[];
-  onToggleSession: (dayIndex: number, sessionId: number) => void;
+  onToggleSession: (dayIndex: number, sessionId: string) => void;
 }) {
-  const [openSessionId, setOpenSessionId] = useState<number | null>(null);
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Close popup when clicking outside
@@ -362,7 +362,7 @@ export function ScheduleGrid({
   onToggleSession,
 }: {
   schedule: DaySchedule[];
-  onToggleSession: (dayIndex: number, sessionId: number) => void;
+  onToggleSession: (dayIndex: number, sessionId: string) => void;
 }) {
   return <TimeGrid schedule={schedule} onToggleSession={onToggleSession} />;
 }

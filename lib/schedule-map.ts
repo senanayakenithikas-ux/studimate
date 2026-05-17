@@ -1,7 +1,7 @@
 import type { WeeklySchedule } from "@/types";
 
 export interface PlannerSession {
-  id: number;
+  id: string;
   subject: string;
   topic: string;
   duration: number;
@@ -49,13 +49,13 @@ export function weeklyScheduleToDaySchedule(
           DAY_NAME_TO_ABBREV[slot.day] ?? slot.day.slice(0, 3);
         return abbrev === day;
       })
-      .map((slot, slotIndex) => ({
-        id: date.getTime() + slotIndex,
+      .map((slot) => ({
+        id: slot.scheduleId,
         subject: slot.subjectName,
         topic: slot.topic,
         duration: slot.durationMinutes,
         startTime: slot.time,
-        completed: false,
+        completed: slot.completed,
       }));
 
     return {

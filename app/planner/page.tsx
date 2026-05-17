@@ -7,6 +7,7 @@ import { EmptySchedule } from "@/components/empty-state";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/client-fetch";
+import { updateScheduleTaskCompleted } from "@/lib/today-schedule";
 import {
   weeklyScheduleToDaySchedule,
   type PlannerDaySchedule,
@@ -220,19 +221,34 @@ export default function PlannerPage() {
     void fetchSchedule(true);
   };
 
-  const toggleSession = (dayIndex: number, sessionId: number) => {
+  const toggleSession = async (dayIndex: number, sessionId: string) => {
+    const day = schedule[dayIndex];
+    const session = day?.sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+
+    const nextCompleted = !session.completed;
+    const snapshot = schedule;
+
     setSchedule((prev) =>
-      prev.map((day, i) =>
+      prev.map((d, i) =>
         i === dayIndex
           ? {
-              ...day,
-              sessions: day.sessions.map((s) =>
-                s.id === sessionId ? { ...s, completed: !s.completed } : s
+              ...d,
+              sessions: d.sessions.map((s) =>
+                s.id === sessionId
+                  ? { ...s, completed: nextCompleted }
+                  : s,
               ),
             }
-          : day
-      )
+          : d,
+      ),
     );
+
+    try {
+      await updateScheduleTaskCompleted(sessionId, nextCompleted);
+    } catch {
+      setSchedule(snapshot);
+    }
   };
 
   return (

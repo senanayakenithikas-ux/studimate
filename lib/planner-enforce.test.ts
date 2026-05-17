@@ -43,6 +43,15 @@ const context = buildPlannerContext({
       duration_mins: 45,
     },
   ],
+  completedTasks: [
+    {
+      schedule_id: "sch-done",
+      subject_id: "sub-a",
+      date: "2026-05-16",
+      topics: "Completed algebra review",
+      duration_mins: 60,
+    },
+  ],
   quizzes: [
     {
       quiz_id: "qz-1",

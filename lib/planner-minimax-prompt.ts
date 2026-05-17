@@ -8,9 +8,10 @@ export interface PlannerMiniMaxPrompt {
 const ADAPTIVE_RULES = `CRITICAL ALGORITHM RULES:
 1. Runway Calculation: Use each subject's precomputed runway_days (days until exam_date). Prioritize shorter runway and lower effective_confidence.
 2. Output Window: Map the long-term path but ONLY output schedule objects for the FIRST WEEK using date_offset 1–7 (1 = today).
-3. Adaptive Carry-Over Rule: For every entry in missed_tasks, schedule high-priority carry-over sessions in date_offset 1 or 2. Prefix topics with "Carried Over:" when carrying forward.
-4. Objective Weakness Adjustment: For performance_audits where weak is true, override self-reported confidence using effective_confidence. Allocate extra revision sessions citing that material's filename.
-5. Resource Alignment: When assigning daily goals, explicitly reference uploaded filenames from study_materials in topics (e.g. "Review Chapter 2 from [filename.pdf]").`;
+3. Adaptive Carry-Over Rule: For every entry in missed_tasks (incomplete work), schedule high-priority carry-over sessions in date_offset 1 or 2. Prefix topics with "Carried Over:" when carrying forward.
+4. Completed Task Respect: Never duplicate or reschedule sessions listed in completed_tasks. The student already finished those; allocate new time to other topics or subjects instead.
+5. Objective Weakness Adjustment: For performance_audits where weak is true, override self-reported confidence using effective_confidence. Allocate extra revision sessions citing that material's filename.
+6. Resource Alignment: When assigning daily goals, explicitly reference uploaded filenames from study_materials in topics (e.g. "Review Chapter 2 from [filename.pdf]").`;
 
 export function buildPlannerMiniMaxPrompt(
   context: PlannerContext,
