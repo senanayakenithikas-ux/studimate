@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/Card";
+import { Card } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { apiFetch } from "@/lib/client-fetch";
 import type { Message } from "@/lib/minimax";

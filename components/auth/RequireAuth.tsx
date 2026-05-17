@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
-import { Spinner } from "@/components/ui/Spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 function AuthLoadingShell() {
   return (
