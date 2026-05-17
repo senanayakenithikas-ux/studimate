@@ -64,6 +64,18 @@ export async function POST(request: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  let extractedText = "";
+  try {
+    const { extractPdfText } = await import("@/lib/pdf-parse-server");
+    extractedText = (await extractPdfText(buffer)).trim();
+  } catch (error) {
+    console.warn(
+      `[upload] PDF text extraction failed for ${file.name}:`,
+      error instanceof Error ? error.message : error,
+    );
+  }
+
   const objectPath = `${userId}/${randomUUID()}-${sanitizeFilename(file.name)}`;
 
   const { error: uploadError } = await supabase.storage
@@ -88,7 +100,7 @@ export async function POST(request: Request) {
       subject_id: subjectId,
       filename: file.name,
       storage_url: publicUrl,
-      extracted_text: "",
+      extracted_text: extractedText,
     })
     .select("id, user_id, subject_id, filename, storage_url, extracted_text")
     .single();

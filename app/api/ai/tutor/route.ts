@@ -7,9 +7,12 @@ import {
   type Message,
 } from "@/lib/minimax";
 import {
-  downloadStudyMaterialText,
   mapStudyMaterialStorageRow,
 } from "@/lib/study-material-storage";
+import {
+  resolveStudyMaterialPromptText,
+  TUTOR_PROMPT_MAX_CHARS,
+} from "@/lib/study-material-prompt";
 import { buildTutorSpeechPayload } from "@/lib/tutor-tts";
 import { getAuthedSupabase } from "@/lib/supabase-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -102,10 +105,13 @@ async function fetchMaterialContext(
 
   const row = mapStudyMaterialStorageRow(data as Record<string, unknown>);
   try {
-    return await downloadStudyMaterialText(supabase, row);
+    return await resolveStudyMaterialPromptText(
+      supabase,
+      row,
+      TUTOR_PROMPT_MAX_CHARS,
+    );
   } catch {
-    const cached = row.extracted_text?.trim() ?? "";
-    return cached;
+    return row.extracted_text?.trim().slice(0, TUTOR_PROMPT_MAX_CHARS) ?? "";
   }
 }
 

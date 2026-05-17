@@ -1,5 +1,5 @@
-/** Max characters of study material included in the tutor system prompt. */
-export const TUTOR_MATERIAL_SLICE = 3000;
+/** Safety cap; routes pass pre-sized summary or excerpt via resolveStudyMaterialPromptText. */
+export const TUTOR_MATERIAL_SLICE = 8_000;
 
 export function buildTutorSystemPrompt(materialExcerpt: string): string {
   const material = materialExcerpt.trim().slice(0, TUTOR_MATERIAL_SLICE);

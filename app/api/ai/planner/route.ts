@@ -20,6 +20,14 @@ import {
   resolvePlannerUserId,
 } from "@/lib/planner-auth";
 import { getRollingPlanRange } from "@/lib/planner-dates";
+import {
+  PLANNER_PROMPT_MAX_CHARS,
+  resolveStudyMaterialPromptText,
+} from "@/lib/study-material-prompt";
+import {
+  mapStudyMaterialStorageRow,
+  type StudyMaterialStorageRow,
+} from "@/lib/study-material-storage";
 import { syncUserStreak } from "@/lib/user-streak-sync";
 import { createServerClient } from "@/lib/supabase-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -158,7 +166,9 @@ async function fetchStudyMaterials(
 
   const { data, error } = await supabase
     .from("study_materials")
-    .select("id, subject_id, filename, extracted_text, created_at")
+    .select(
+      "id, subject_id, filename, extracted_text, storage_url, created_at",
+    )
     .eq("user_id", userId)
     .in("subject_id", subjectIds)
     .order("created_at", { ascending: false });
@@ -167,15 +177,46 @@ async function fetchStudyMaterials(
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((row) => {
+  const rows = (data ?? []).map((row) => {
     const record = row as Record<string, unknown>;
     return {
       id: String(record.id),
       subject_id: String(record.subject_id),
       filename: String(record.filename ?? "material.pdf"),
       extracted_text: String(record.extracted_text ?? ""),
+      storage_url: String(record.storage_url ?? ""),
     };
   });
+
+  return Promise.all(
+    rows.map(async (material) => {
+      const storageRow: StudyMaterialStorageRow = {
+        ...mapStudyMaterialStorageRow({
+          id: material.id,
+          user_id: userId,
+          filename: material.filename,
+          storage_url: material.storage_url,
+          extracted_text: material.extracted_text,
+        }),
+      };
+
+      try {
+        const excerpt = await resolveStudyMaterialPromptText(
+          supabase,
+          storageRow,
+          PLANNER_PROMPT_MAX_CHARS,
+        );
+        return { ...material, extracted_text: excerpt };
+      } catch {
+        return {
+          ...material,
+          extracted_text: material.extracted_text
+            .trim()
+            .slice(0, PLANNER_PROMPT_MAX_CHARS),
+        };
+      }
+    }),
+  );
 }
 
 async function fetchMissedTasks(

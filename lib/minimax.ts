@@ -631,13 +631,64 @@ Student ecosystem: ${JSON.stringify(context)}`;
   }
 }
 
+const SUMMARY_SAMPLE_CHARS = 48_000;
+
+function sampleTextForSummary(text: string, maxChars: number): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+  const part = Math.floor(maxChars / 3);
+  const midStart = Math.max(
+    0,
+    Math.floor(text.length / 2) - Math.floor(part / 2),
+  );
+  return [
+    text.slice(0, part),
+    "\n\n[... omitted ...]\n\n",
+    text.slice(midStart, midStart + part),
+    "\n\n[... omitted ...]\n\n",
+    text.slice(-part),
+  ].join("");
+}
+
+/**
+ * Compresses long study text into structured notes for AI prompts (cached in storage).
+ */
+export async function generateStudyMaterialSummary(
+  sourceText: string,
+  filename: string,
+): Promise<string> {
+  const trimmed = sourceText.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (isMiniMaxMockEnabled()) {
+    return trimmed.slice(0, 6_000);
+  }
+
+  const sampled = sampleTextForSummary(trimmed, SUMMARY_SAMPLE_CHARS);
+  const systemPrompt =
+    "You compress study materials into dense revision notes. Plain text only. No markdown fences.";
+  const userPrompt = `Create structured study notes from "${filename}" covering the full document (beginning, middle, and end).
+Include: main topics, key definitions, formulas, important facts, and chapter/section themes if visible.
+Target about 1200-2000 words. Do not invent content not supported by the source.
+
+Source excerpts:
+${sampled}`;
+
+  return (await callMiniMax(systemPrompt, userPrompt, 4096)).trim();
+}
+
 /**
  * Feature: Builds 5 multiple-choice questions from study text content context.
  * Automatically transforms key object structures into ordered string arrays for the UI.
  */
 export async function generateQuiz(extractedText: string): Promise<QuizQuestion[]> {
   const trimmed = extractedText.trim();
-  assertUsableStudyText(trimmed);
+  if (!trimmed) {
+    throw new PdfNotSuitableForQuizError();
+  }
 
   if (shouldUseQuizMockFallback()) {
     return mockQuizQuestions();

@@ -30,6 +30,7 @@ const context = buildPlannerContext({
       subject_id: "sub-a",
       filename: "calc.pdf",
       extracted_text: "content",
+      storage_url: "https://example.com/storage/v1/object/public/study-materials/u/calc.pdf",
     },
   ],
   missedTasks: [

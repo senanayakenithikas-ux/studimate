@@ -5,10 +5,11 @@ import {
   tutorChat,
   type Message,
 } from "@/lib/minimax";
+import { mapStudyMaterialStorageRow } from "@/lib/study-material-storage";
 import {
-  downloadStudyMaterialText,
-  mapStudyMaterialStorageRow,
-} from "@/lib/study-material-storage";
+  resolveStudyMaterialPromptText,
+  TUTOR_PROMPT_MAX_CHARS,
+} from "@/lib/study-material-prompt";
 import { getAuthedSupabase } from "@/lib/supabase-server";
 import { buildTutorSpeechPayload } from "@/lib/tutor-tts";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -52,9 +53,13 @@ async function fetchMaterialContext(
     if (error || !data) return "";
     const row = mapStudyMaterialStorageRow(data as Record<string, unknown>);
     try {
-      return await downloadStudyMaterialText(supabase, row);
+      return await resolveStudyMaterialPromptText(
+        supabase,
+        row,
+        TUTOR_PROMPT_MAX_CHARS,
+      );
     } catch {
-      return row.extracted_text?.trim() ?? "";
+      return row.extracted_text?.trim().slice(0, TUTOR_PROMPT_MAX_CHARS) ?? "";
     }
   };
 

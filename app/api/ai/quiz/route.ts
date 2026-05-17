@@ -16,6 +16,10 @@ import {
   downloadStudyMaterialText,
   mapStudyMaterialStorageRow,
 } from "@/lib/study-material-storage";
+import {
+  QUIZ_PROMPT_MAX_CHARS,
+  resolveStudyMaterialPromptText,
+} from "@/lib/study-material-prompt";
 import { getAuthedSupabase } from "@/lib/supabase-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -142,17 +146,32 @@ export async function POST(request: Request): Promise<NextResponse> {
       materialRow as Record<string, unknown>,
     );
 
-    let studyText: string;
+    let fullStudyText: string;
     try {
-      studyText = await downloadStudyMaterialText(supabase, material);
+      fullStudyText = await downloadStudyMaterialText(supabase, material);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to load study material";
       return errorResponse(message, 502);
     }
 
-    if (!isUsableStudyText(studyText)) {
+    if (!isUsableStudyText(fullStudyText)) {
       return pdfNotSuitableResponse();
+    }
+
+    let studyText: string;
+    try {
+      studyText = await resolveStudyMaterialPromptText(
+        supabase,
+        material,
+        QUIZ_PROMPT_MAX_CHARS,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to prepare study material for quiz";
+      return errorResponse(message, 502);
     }
 
     const { error: cleanupError } = await supabase

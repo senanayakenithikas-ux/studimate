@@ -1,5 +1,5 @@
 /** Max characters of material excerpt included in the planner MiniMax prompt. */
-export const PLANNER_MATERIAL_SLICE = 2000;
+export const PLANNER_MATERIAL_SLICE = 4_000;
 
 export interface PlannerSubjectInput {
   id: string;
@@ -14,6 +14,7 @@ export interface PlannerMaterialInput {
   subject_id: string;
   filename: string;
   extracted_text: string;
+  storage_url: string;
 }
 
 export interface PlannerMissedTaskInput {
