@@ -36,6 +36,7 @@ interface TranscriptLine {
 interface VoiceChatProps {
   materialId?: string;
   materialName?: string;
+  materialsLoading?: boolean;
 }
 
 function buildTranscriptFromResults(
@@ -48,7 +49,11 @@ function buildTranscriptFromResults(
   return text.trim();
 }
 
-export function VoiceChat({ materialId, materialName }: VoiceChatProps) {
+export function VoiceChat({
+  materialId,
+  materialName,
+  materialsLoading = false,
+}: VoiceChatProps) {
   const [interim, setInterim] = useState("");
   const [lines, setLines] = useState<TranscriptLine[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -86,12 +91,15 @@ export function VoiceChat({ materialId, materialName }: VoiceChatProps) {
       const body: Record<string, unknown> = {
         message: userText,
         history: historyRef.current,
+        voice_mode: true,
+        ephemeral: true,
+        include_speech: true,
       };
       if (materialId) {
         body.material_id = materialId;
       }
 
-      const data = await apiFetch<TutorVoicePostResponse>("/api/ai/tutor/voice", {
+      const data = await apiFetch<TutorVoicePostResponse>("/api/ai/tutor", {
         method: "POST",
         body: JSON.stringify(body),
       });
@@ -268,7 +276,7 @@ export function VoiceChat({ materialId, materialName }: VoiceChatProps) {
   }, [clearSilenceTimer]);
 
   const statusLabel: Record<VoiceStatus, string> = {
-    idle: "Tap the microphone and ask your question",
+    idle: "Tap the mic — MiniMax tutor listens, then speaks the answer",
     listening: `Listening… (pauses up to ${VOICE_SILENCE_MS / 1000}s are OK)`,
     processing: "Thinking…",
     speaking: "Speaking…",
@@ -277,16 +285,17 @@ export function VoiceChat({ materialId, materialName }: VoiceChatProps) {
   };
 
   const micDisabled =
+    materialsLoading ||
     status === "processing" ||
     status === "speaking" ||
     status === "unsupported" ||
     !materialId;
 
   return (
-    <Card className="flex h-[calc(100vh-14rem)] flex-col gap-4 border-border bg-card/50 py-4">
+    <Card className="flex h-[calc(100vh-16rem)] flex-col gap-4 border-border bg-card/50 py-4 md:h-[calc(100vh-12rem)]">
       <div className="flex items-center justify-between gap-2 px-4">
-        <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-300">
-          Voice — not saved to chat history
+        <span className="rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-xs font-medium text-indigo-300">
+          Voice bot · speak in, hear answers (not read-aloud)
         </span>
         {materialName ? (
           <span className="max-w-[140px] truncate text-xs text-muted-foreground">
@@ -349,9 +358,13 @@ export function VoiceChat({ materialId, materialName }: VoiceChatProps) {
           </Button>
         ) : null}
 
-        {!materialId ? (
+        {materialsLoading ? (
+          <p className="text-center text-xs text-muted-foreground">
+            Loading your study materials…
+          </p>
+        ) : !materialId ? (
           <p className="text-center text-xs text-amber-400/90">
-            Select a study material in Text chat mode first, or upload a PDF.
+            Choose a material above or upload a PDF to start the voice tutor.
           </p>
         ) : null}
       </div>
@@ -359,9 +372,9 @@ export function VoiceChat({ materialId, materialName }: VoiceChatProps) {
       <div className="mx-4 max-h-40 space-y-2 overflow-y-auto border-t border-border pt-3">
         {lines.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            Speak naturally — we wait {VOICE_SILENCE_MS / 1000} seconds of
-            silence before sending. Answers use MiniMax voice. Chrome or Edge
-            recommended.
+            This is a live voice conversation with the same MiniMax tutor as text
+            chat — you talk, it replies out loud. Not the same as the speaker
+            button in text chat (read-aloud). Chrome or Edge recommended.
           </p>
         ) : (
           lines.map((line) => (

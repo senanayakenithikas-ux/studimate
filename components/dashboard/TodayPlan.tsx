@@ -3,11 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Calendar, Check } from "lucide-react";
+import { AddScheduleTaskDialog } from "@/components/dashboard/AddScheduleTaskDialog";
 import {
   fetchTodayScheduleTasks,
+  fetchUserSubjects,
   updateScheduleTaskCompleted,
 } from "@/lib/today-schedule";
+import { getTodayDateString } from "@/lib/planner-dates";
 import { cn } from "@/lib/utils";
+import type { DbSubject } from "@/types/schedule";
 import type { TodayScheduleTask } from "@/types";
 
 function TaskCheckbox({
@@ -91,20 +95,28 @@ function TodayPlanSkeleton() {
 
 export function TodayPlan() {
   const [tasks, setTasks] = useState<TodayScheduleTask[]>([]);
+  const [subjects, setSubjects] = useState<DbSubject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [createNotice, setCreateNotice] = useState<string | null>(null);
+
+  const loadPlan = useCallback(async () => {
+    setError(null);
+    const [rows, subjectRows] = await Promise.all([
+      fetchTodayScheduleTasks(),
+      fetchUserSubjects(),
+    ]);
+    setTasks(rows);
+    setSubjects(subjectRows);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      setError(null);
       setIsLoading(true);
       try {
-        const rows = await fetchTodayScheduleTasks();
-        if (!cancelled) {
-          setTasks(rows);
-        }
+        await loadPlan();
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -122,7 +134,7 @@ export function TodayPlan() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadPlan]);
 
   const handleToggle = useCallback(async (id: string) => {
     let snapshot: TodayScheduleTask[] = [];
@@ -147,14 +159,47 @@ export function TodayPlan() {
     }
   }, []);
 
+  const handleSubjectCreated = useCallback((subject: DbSubject) => {
+    setSubjects((prev) => {
+      if (prev.some((s) => s.id === subject.id)) return prev;
+      return [...prev, subject].sort((a, b) => a.name.localeCompare(b.name));
+    });
+  }, []);
+
+  const handleTaskCreated = useCallback(
+    (task: TodayScheduleTask, scheduledDate: string) => {
+      setCreateNotice(null);
+      if (scheduledDate === getTodayDateString()) {
+        setTasks((prev) => {
+          if (prev.some((t) => t.id === task.id)) return prev;
+          return [task, ...prev];
+        });
+      } else {
+        setCreateNotice(
+          `Task scheduled for ${scheduledDate}. Switch the date in the form to today to see it here.`,
+        );
+      }
+    },
+    [],
+  );
+
   return (
-    <div
-      className="rounded-2xl border border-slate-700/60 bg-[#111827] p-6 shadow-lg shadow-black/20"
-    >
-      <h3 className="mb-5 flex items-center gap-2.5 text-base font-bold text-white">
-        <Calendar className="h-5 w-5 text-indigo-400" aria-hidden />
-        Today&apos;s Plan
-      </h3>
+    <div className="rounded-2xl border border-slate-700/60 bg-[#111827] p-6 shadow-lg shadow-black/20">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <h3 className="flex items-center gap-2.5 text-base font-bold text-white">
+          <Calendar className="h-5 w-5 text-indigo-400" aria-hidden />
+          Today&apos;s Plan
+        </h3>
+        <AddScheduleTaskDialog
+          subjects={subjects}
+          onSubjectCreated={handleSubjectCreated}
+          onTaskCreated={handleTaskCreated}
+        />
+      </div>
+
+      {createNotice ? (
+        <p className="mb-3 text-xs text-indigo-300/90">{createNotice}</p>
+      ) : null}
 
       {isLoading ? (
         <TodayPlanSkeleton />
@@ -163,12 +208,14 @@ export function TodayPlan() {
       ) : tasks.length === 0 ? (
         <p className="text-sm text-slate-400">
           No study tasks for today.{" "}
+          <span className="text-slate-500">Use Add task</span> or{" "}
           <Link
             href="/planner"
             className="text-indigo-400 underline-offset-2 hover:text-indigo-300 hover:underline"
           >
-            Generate a plan
+            generate a plan
           </Link>
+          .
         </p>
       ) : (
         <div className="space-y-3">

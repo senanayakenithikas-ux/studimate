@@ -9,6 +9,7 @@ import {
   Calendar,
   Brain,
   MessageSquare,
+  Mic,
   Upload,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -19,6 +20,7 @@ const navItems = [
   { href: "/planner", label: "Planner", icon: Calendar },
   { href: "/quiz", label: "Quiz", icon: Brain },
   { href: "/tutor", label: "Tutor", icon: MessageSquare },
+  { href: "/tutor/voice", label: "Voice Tutor", icon: Mic },
   { href: "/upload", label: "Upload", icon: Upload },
 ];
 

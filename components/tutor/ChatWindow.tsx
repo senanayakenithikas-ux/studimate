@@ -156,8 +156,8 @@ export function ChatWindow({
           </h1>
           <p className="text-sm text-muted-foreground">
             {readAloudEnabled
-              ? "Read-aloud on — replies play with MiniMax voice"
-              : "Tap the speaker to hear tutor replies (MiniMax voice)"}
+              ? "Read-aloud on — plays written replies (TTS only, not voice chat)"
+              : "MiniMax tutor · type questions below"}
           </p>
         </div>
 
@@ -219,8 +219,9 @@ export function ChatWindow({
                   Start a conversation
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  Ask about your study materials. Use the speaker button below to
-                  hear replies read aloud with MiniMax voice.
+                  Ask about your study materials. For a spoken back-and-forth
+                  tutor, use the Voice bot tab — the speaker button here only
+                  reads text replies aloud.
                 </p>
               </div>
             )}
@@ -274,18 +275,26 @@ export function ChatWindow({
                 onReadAloudToggle();
               }}
               disabled={isTyping}
+              title={
+                readAloudEnabled
+                  ? "Turn off read-aloud (text-to-speech only)"
+                  : "Read tutor replies aloud (not voice chat)"
+              }
               aria-label={
                 readAloudEnabled ? "Turn off read aloud" : "Turn on read aloud"
               }
               aria-pressed={readAloudEnabled}
               className={cn(
-                "h-11 w-11 p-0 shrink-0",
+                "h-11 shrink-0 gap-1.5 px-3",
                 readAloudEnabled
                   ? "bg-indigo-600 hover:bg-indigo-500 text-white ring-2 ring-indigo-400/50"
                   : "border-border text-muted-foreground hover:text-foreground",
               )}
             >
-              <Volume2 className="w-4 h-4" />
+              <Volume2 className="h-4 w-4 shrink-0" />
+              <span className="hidden text-xs font-medium sm:inline">
+                {readAloudEnabled ? "Aloud on" : "Read aloud"}
+              </span>
             </Button>
             <Button
               onClick={() => {

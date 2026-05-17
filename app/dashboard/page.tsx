@@ -11,7 +11,7 @@ import { CardSkeleton, LoadingSpinner } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/client-fetch";
 import type { Streak, Subject as ApiSubject } from "@/types";
-import { Calendar, Brain, MessageSquare, Sparkles, Plus } from "lucide-react";
+import { Calendar, Brain, MessageSquare, Mic, Sparkles, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +43,12 @@ function QuickActions() {
       href: "/tutor",
       icon: MessageSquare,
       color: "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30",
+    },
+    {
+      label: "Voice Tutor",
+      href: "/tutor/voice",
+      icon: Mic,
+      color: "bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30",
     },
   ];
 
