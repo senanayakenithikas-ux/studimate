@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { clearAppSession } from "@/lib/app-tab-session";
 import { clearAccessTokenCache } from "@/lib/client-fetch";
+import { clearProfileCache } from "@/hooks/use-user-profile";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ export function SignOutButton({ className, label }: SignOutButtonProps) {
       const supabase = createClient();
       await supabase.auth.signOut();
       clearAccessTokenCache();
+      clearProfileCache();
       clearAppSession();
       router.push("/login");
       router.refresh();

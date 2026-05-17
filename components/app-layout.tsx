@@ -3,10 +3,7 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { BottomNav } from "@/components/bottom-nav";
-import {
-  UserProfileProvider,
-  useUserProfile,
-} from "@/hooks/use-user-profile";
+import { useUserProfile } from "@/hooks/use-user-profile";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -31,9 +28,5 @@ function AppLayoutInner({ children, title }: AppLayoutProps) {
 }
 
 export function AppLayout({ children, title }: AppLayoutProps) {
-  return (
-    <UserProfileProvider>
-      <AppLayoutInner title={title}>{children}</AppLayoutInner>
-    </UserProfileProvider>
-  );
+  return <AppLayoutInner title={title}>{children}</AppLayoutInner>;
 }

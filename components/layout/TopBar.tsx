@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useUserProfile } from "@/hooks/use-user-profile";
 
 interface TopBarProps {
   userName?: string;
   title?: string;
 }
 
-export function TopBar({ userName = "Student", title = "Studimate" }: TopBarProps) {
+export function TopBar({ userName: userNameProp, title = "Studimate" }: TopBarProps) {
+  const { displayName } = useUserProfile();
+  const userName = userNameProp ?? displayName;
+
   return (
     <header className="md:hidden sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background px-4 py-3">
       <Link href="/dashboard" className="flex items-center gap-2 min-w-0">

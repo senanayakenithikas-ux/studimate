@@ -14,6 +14,7 @@ import {
   unregisterCurrentTab,
 } from "@/lib/app-tab-session";
 import { clearAccessTokenCache } from "@/lib/client-fetch";
+import { clearProfileCache } from "@/hooks/use-user-profile";
 import { createClient } from "@/lib/supabase/client";
 
 const LOGOUT_URL = "/api/auth/logout";
@@ -62,6 +63,7 @@ export function TabSessionManager() {
         signingOut.current = true;
         await supabase.auth.signOut();
         clearAccessTokenCache();
+        clearProfileCache();
         clearAppSession();
         router.push("/login");
         router.refresh();
@@ -77,6 +79,7 @@ export function TabSessionManager() {
 
     function performLastTabLogout() {
       clearAccessTokenCache();
+      clearProfileCache();
       clearAppSession();
       requestServerLogout();
       void createClient().auth.signOut();
@@ -96,6 +99,7 @@ export function TabSessionManager() {
         signingOut.current = true;
         await supabase.auth.signOut();
         clearAccessTokenCache();
+        clearProfileCache();
         router.push("/login");
         router.refresh();
       })();

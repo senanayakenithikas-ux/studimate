@@ -12,6 +12,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useUserProfile } from "@/hooks/use-user-profile";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -25,8 +26,10 @@ interface SidebarProps {
   userName?: string;
 }
 
-export function Sidebar({ userName = "Student" }: SidebarProps) {
+export function Sidebar({ userName: userNameProp }: SidebarProps) {
   const pathname = usePathname();
+  const { displayName } = useUserProfile();
+  const userName = userNameProp ?? displayName;
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-sidebar border-r border-sidebar-border h-screen sticky top-0">
