@@ -1,6 +1,14 @@
 import { jsonError, jsonOk } from "@/lib/api";
-import { createServerClient } from "@/lib/supabase-server";
+import { usernameToEmail } from "@/lib/auth-credentials";
+import { createAnonClient, createServerClient } from "@/lib/supabase-server";
 import type { LoginBody, User } from "@/types";
+
+const INVALID_CREDENTIALS = "Invalid username or password";
+
+interface UserAuthRow {
+  id: string;
+  username: string;
+}
 
 export async function POST(request: Request) {
   try {
@@ -12,13 +20,19 @@ export async function POST(request: Request) {
     }
 
     if (!body.username?.trim()) {
-      return jsonError("Username is required");
+      return jsonError("Username is required", 400);
+    }
+
+    if (!body.password) {
+      return jsonError("Password is required", 400);
     }
 
     const username = body.username.trim();
-    const supabase = createServerClient();
+    const password = body.password;
 
-    const { data: profile, error: profileLookupError } = await supabase
+    const admin = createServerClient();
+
+    const { data: profile, error: profileLookupError } = await admin
       .from("users")
       .select("id, username")
       .eq("username", username)
@@ -28,16 +42,32 @@ export async function POST(request: Request) {
       return jsonError(profileLookupError.message, 500);
     }
 
-    if (!profile) {
-      return jsonError("You have not signed up yet.", 401);
+    const row = profile as UserAuthRow | null;
+    if (!row) {
+      return jsonError(INVALID_CREDENTIALS, 401);
+    }
+
+    const email = usernameToEmail(username);
+    const anon = createAnonClient();
+    const { data, error } = await anon.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error || !data.session?.access_token) {
+      return jsonError(INVALID_CREDENTIALS, 401);
     }
 
     const user: User = {
-      id: profile.id,
-      username: profile.username,
+      id: row.id,
+      username: row.username,
     };
 
-    return jsonOk({ user, token: profile.id });
+    return jsonOk({
+      user,
+      token: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+    });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "An unexpected error occurred";
