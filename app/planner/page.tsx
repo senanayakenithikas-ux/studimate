@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { ScheduleGrid } from "@/components/planner/ScheduleGrid";
 import { EmptySchedule } from "@/components/empty-state";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/client-fetch";
+import {
+  fetchSavedPlannerSchedule,
+  generatePlannerSchedule,
+  updatePlannerSchedule,
+  weeklyScheduleHasSessions,
+} from "@/lib/planner-client";
 import { updateScheduleTaskCompleted } from "@/lib/today-schedule";
 import {
   weeklyScheduleToDaySchedule,
@@ -153,8 +158,19 @@ function WeeklyStats({ schedule }: { schedule: DaySchedule[] }) {
   );
 }
 
+function parseWeekStartDate(weekStart: string): Date {
+  const [y, m, d] = weekStart.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const dayOfWeek = date.getDay();
+  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 export default function PlannerPage() {
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBusy, setIsBusy] = useState(false);
   const [hasSchedule, setHasSchedule] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<DaySchedule[]>([]);
@@ -194,31 +210,64 @@ export default function PlannerPage() {
     setCurrentWeekStart(newStart);
   };
 
-  async function fetchSchedule(regenerate = false) {
-    setIsGenerating(true);
+  const applyWeeklySchedule = useCallback((data: WeeklySchedule) => {
+    const days = weeklyScheduleToDaySchedule(data);
+    setSchedule(days);
+    setHasSchedule(weeklyScheduleHasSessions(data));
+    if (data.weekStart) {
+      setCurrentWeekStart(parseWeekStartDate(data.weekStart));
+    }
+  }, []);
+
+  const loadSavedSchedule = useCallback(async () => {
     setError(null);
+    setIsLoading(true);
     try {
-      const data = await apiFetch<WeeklySchedule>("/api/ai/planner", {
-        method: "POST",
-        body: JSON.stringify(regenerate ? { regenerate: true } : {}),
-      });
-      setSchedule(weeklyScheduleToDaySchedule(data));
-      setHasSchedule(true);
+      const data = await fetchSavedPlannerSchedule();
+      applyWeeklySchedule(data);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to generate schedule",
+        err instanceof Error ? err.message : "Failed to load your schedule",
       );
+      setHasSchedule(false);
+      setSchedule([]);
     } finally {
-      setIsGenerating(false);
+      setIsLoading(false);
+    }
+  }, [applyWeeklySchedule]);
+
+  useEffect(() => {
+    void loadSavedSchedule();
+  }, [loadSavedSchedule]);
+
+  async function runScheduleMutation(
+    fetcher: () => Promise<WeeklySchedule>,
+    errorMessage: string,
+  ) {
+    setIsBusy(true);
+    setError(null);
+    try {
+      const data = await fetcher();
+      applyWeeklySchedule(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : errorMessage);
+    } finally {
+      setIsBusy(false);
     }
   }
 
   const handleGenerateSchedule = () => {
-    void fetchSchedule(false);
+    void runScheduleMutation(
+      generatePlannerSchedule,
+      "Failed to generate schedule",
+    );
   };
 
-  const handleRegenerateSchedule = () => {
-    void fetchSchedule(true);
+  const handleUpdateSchedule = () => {
+    void runScheduleMutation(
+      updatePlannerSchedule,
+      "Failed to update schedule",
+    );
   };
 
   const toggleSession = async (dayIndex: number, sessionId: string) => {
@@ -261,7 +310,7 @@ export default function PlannerPage() {
             Your AI-generated weekly study schedule
           </p>
         </div>
-        {hasSchedule && !isGenerating && (
+        {hasSchedule && !isLoading && !isBusy && (
           <WeekNavigator
             weekLabel={getWeekLabel()}
             onPrev={goToPrevWeek}
@@ -274,9 +323,20 @@ export default function PlannerPage() {
         <p className="mb-4 text-sm text-destructive">{error}</p>
       ) : null}
 
-      {isGenerating ? (
+      {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20">
-          <LoadingSpinner size="lg" text="Generating your schedule..." />
+          <LoadingSpinner size="lg" text="Loading your schedule..." />
+        </div>
+      ) : isBusy ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <LoadingSpinner
+            size="lg"
+            text={
+              hasSchedule
+                ? "Updating your schedule..."
+                : "Generating your schedule..."
+            }
+          />
         </div>
       ) : !hasSchedule ? (
         <EmptySchedule onGenerate={handleGenerateSchedule} />
@@ -292,12 +352,13 @@ export default function PlannerPage() {
             <WeeklyStats schedule={schedule} />
             <SubjectLegend />
             <Button
-              onClick={handleRegenerateSchedule}
+              onClick={handleUpdateSchedule}
               className="w-full"
               variant="secondary"
+              disabled={isBusy}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
-              Regenerate Schedule
+              Update Schedule
             </Button>
           </div>
         </div>

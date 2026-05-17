@@ -411,39 +411,112 @@ function subjectsToPlannerInput(subjects: Subject[]): PlannerSubjectInput[] {
   }));
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
-  try {
-    const authHeader = request.headers.get("Authorization");
-    const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
-    if (!token) {
-      return errorResponse("Unauthorized", 401);
-    }
+async function fetchScheduleRecordsInRange(
+  supabase: SupabaseClient,
+  userId: string,
+  start: string,
+  end: string,
+): Promise<ScheduleRecord[]> {
+  const { data, error } = await supabase
+    .from("schedules")
+    .select(
+      "id, user_id, subject_id, date, duration_mins, topics, session_type, completed",
+    )
+    .eq("user_id", userId)
+    .gte("date", start)
+    .lte("date", end)
+    .order("date", { ascending: true });
 
-    const supabase = createPlannerSupabaseClient();
-    const userId = await resolvePlannerUserId(supabase, token);
-    const body = (await request.json().catch(() => ({}))) as PlannerRequestBody;
+  if (error) {
+    throw new Error(error.message);
+  }
 
-    const { error: ensureProfileError } = await ensurePlannerUserProfile(
-      supabase,
-      userId,
-    );
-    if (ensureProfileError) {
-      return errorResponse(ensureProfileError, 500);
-    }
+  return (data ?? []).map((row: Record<string, unknown>) =>
+    mapScheduleRow(row),
+  );
+}
 
-    const { profile, error: profileError } = await fetchUserProfile(
-      supabase,
-      userId,
-    );
-    if (profileError) {
-      return errorResponse(profileError, 500);
-    }
-    if (!profile) {
-      return errorResponse(
+type PlannerAuthResult =
+  | { ok: true; supabase: SupabaseClient; userId: string }
+  | { ok: false; response: NextResponse };
+
+async function authenticatePlannerRequest(
+  request: Request,
+): Promise<PlannerAuthResult> {
+  const authHeader = request.headers.get("Authorization");
+  const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
+  if (!token) {
+    return { ok: false, response: errorResponse("Unauthorized", 401) };
+  }
+
+  const supabase = createPlannerSupabaseClient();
+  const userId = await resolvePlannerUserId(supabase, token);
+
+  const { error: ensureProfileError } = await ensurePlannerUserProfile(
+    supabase,
+    userId,
+  );
+  if (ensureProfileError) {
+    return { ok: false, response: errorResponse(ensureProfileError, 500) };
+  }
+
+  const { profile, error: profileError } = await fetchUserProfile(
+    supabase,
+    userId,
+  );
+  if (profileError) {
+    return { ok: false, response: errorResponse(profileError, 500) };
+  }
+  if (!profile) {
+    return {
+      ok: false,
+      response: errorResponse(
         "User profile not found. Complete signup sync first.",
         404,
-      );
+      ),
+    };
+  }
+
+  return { ok: true, supabase, userId };
+}
+
+/** Read saved schedules for the current 7-day window (no AI generation). */
+export async function GET(request: Request): Promise<NextResponse> {
+  try {
+    const auth = await authenticatePlannerRequest(request);
+    if (!auth.ok) {
+      return auth.response;
     }
+
+    const { supabase, userId } = auth;
+    const subjects = await fetchSubjectsForUser(supabase, userId);
+    const { start, end } = getRollingPlanRange();
+    const records = await fetchScheduleRecordsInRange(
+      supabase,
+      userId,
+      start,
+      end,
+    );
+
+    return NextResponse.json(
+      plannerSuccessPayload(records, subjects, true, false),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load schedule";
+    return errorResponse(message, 500);
+  }
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    const auth = await authenticatePlannerRequest(request);
+    if (!auth.ok) {
+      return auth.response;
+    }
+
+    const { supabase, userId } = auth;
+    const body = (await request.json().catch(() => ({}))) as PlannerRequestBody;
 
     let subjects: Subject[];
     const fromBody = parseSubjectsFromBody(body);
@@ -464,24 +537,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     const forceRegenerate = body.regenerate === true;
 
     if (!forceRegenerate) {
-      const { data: cachedRows, error: cacheError } = await supabase
-        .from("schedules")
-        .select(
-          "id, user_id, subject_id, date, duration_mins, topics, session_type, completed",
-        )
-        .eq("user_id", userId)
-        .gte("date", start)
-        .lte("date", end)
-        .order("date", { ascending: true });
+      const records = await fetchScheduleRecordsInRange(
+        supabase,
+        userId,
+        start,
+        end,
+      );
 
-      if (cacheError) {
-        return errorResponse(cacheError.message, 500);
-      }
-
-      if (cachedRows && cachedRows.length > 0) {
-        const records = cachedRows.map((row: Record<string, unknown>) =>
-          mapScheduleRow(row),
-        );
+      if (records.length > 0) {
         return NextResponse.json(
           plannerSuccessPayload(records, subjects, true, false),
         );
