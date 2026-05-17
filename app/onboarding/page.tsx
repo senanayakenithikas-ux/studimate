@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { Plus, X, Calendar, Sparkles, ArrowRight, Check } from "lucide-react";
 import { apiFetch } from "@/lib/client-fetch";
+import { normalizeSubjectName } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 
 interface Subject {
@@ -64,7 +65,24 @@ export default function OnboardingPage() {
     }
   };
 
+  const findDuplicateSubjectInForm = (entries: Subject[]): string | null => {
+    const seen = new Set<string>();
+    for (const entry of entries) {
+      const key = normalizeSubjectName(entry.name);
+      if (!key) continue;
+      if (seen.has(key)) return entry.name.trim();
+      seen.add(key);
+    }
+    return null;
+  };
+
   const handleFinish = async () => {
+    const duplicate = findDuplicateSubjectInForm(validSubjects);
+    if (duplicate) {
+      setError(`You already added "${duplicate}". Each subject name must be unique.`);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {

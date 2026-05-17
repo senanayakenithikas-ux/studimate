@@ -10,6 +10,7 @@ import { TodayPlan } from "@/components/dashboard/TodayPlan";
 import { CardSkeleton, LoadingSpinner } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/client-fetch";
+import { hasDuplicateSubjectName } from "@/lib/subjects";
 import type { Streak, Subject as ApiSubject } from "@/types";
 import { Calendar, Brain, MessageSquare, Mic, Sparkles, Plus } from "lucide-react";
 import {
@@ -146,6 +147,11 @@ function DashboardContent() {
 
   const handleAddSubject = async () => {
     if (isAddingSubject || !newSubject.name || !newSubject.examDate) return;
+
+    if (hasDuplicateSubjectName(newSubject.name, subjects)) {
+      setError("You already have a subject with this name");
+      return;
+    }
 
     setIsAddingSubject(true);
     try {

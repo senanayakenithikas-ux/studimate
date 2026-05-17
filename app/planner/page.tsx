@@ -19,25 +19,20 @@ import {
   weeklyScheduleToDaySchedule,
   type PlannerDaySchedule,
 } from "@/lib/schedule-map";
-import type { WeeklySchedule } from "@/types";
+import type { WeeklySchedule, Subject } from "@/types";
 import {
   formatDateString,
   getMondayOfWeek,
   getMondayOfWeekString,
 } from "@/lib/planner-dates";
+import { apiFetch } from "@/lib/client-fetch";
+import {
+  buildSubjectColorMap,
+  type SubjectColorStyle,
+} from "@/lib/subject-colors";
 import { RefreshCw, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
 type DaySchedule = PlannerDaySchedule;
-
-const legendColors: Record<string, { accent: string }> = {
-  Mathematics: { accent: "#3b82f6" },
-  Physics: { accent: "#06b6d4" },
-  Chemistry: { accent: "#f59e0b" },
-  Biology: { accent: "#ef4444" },
-  History: { accent: "#10b981" },
-};
-
-const defaultLegendColor = { accent: "#64748b" };
 
 function WeekNavigator({
   weekLabel,
@@ -74,21 +69,37 @@ function WeekNavigator({
   );
 }
 
-function SubjectLegend() {
-  const subjects = ["Mathematics", "Physics", "Chemistry", "Biology", "History"];
+function SubjectLegend({
+  subjects,
+  colorMap,
+}: {
+  subjects: Subject[];
+  colorMap: Record<string, SubjectColorStyle>;
+}) {
+  if (subjects.length === 0) {
+    return (
+      <div className="bg-card/50 rounded-xl border border-border p-4">
+        <h3 className="text-sm font-semibold text-foreground mb-2">Subjects</h3>
+        <p className="text-sm text-muted-foreground">
+          Add subjects on your dashboard to see them here.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card/50 rounded-xl border border-border p-4">
       <h3 className="text-sm font-semibold text-foreground mb-3">Subjects</h3>
       <div className="space-y-2.5">
         {subjects.map((subject) => {
-          const colors = legendColors[subject] || defaultLegendColor;
+          const colors = colorMap[subject.name];
           return (
-            <div key={subject} className="flex items-center gap-2.5">
+            <div key={subject.id} className="flex items-center gap-2.5">
               <div
                 className="w-3 h-3 rounded"
-                style={{ backgroundColor: colors.accent }}
+                style={{ backgroundColor: colors?.accent ?? "#64748b" }}
               />
-              <span className="text-sm text-foreground">{subject}</span>
+              <span className="text-sm text-foreground">{subject.name}</span>
             </div>
           );
         })}
@@ -187,6 +198,8 @@ export default function PlannerPage() {
     getMondayOfWeek(new Date()),
   );
   const weekCacheRef = useRef<Map<string, DaySchedule[]>>(new Map());
+  const [userSubjects, setUserSubjects] = useState<Subject[]>([]);
+  const subjectColorMap = buildSubjectColorMap(userSubjects);
 
   const getWeekLabel = () => {
     const weekEnd = new Date(currentWeekStart);
@@ -287,9 +300,19 @@ export default function PlannerPage() {
     }
   }, [applyWeeklySchedule]);
 
+  const loadUserSubjects = useCallback(async () => {
+    try {
+      const data = await apiFetch<Subject[]>("/api/subjects");
+      setUserSubjects(data);
+    } catch {
+      setUserSubjects([]);
+    }
+  }, []);
+
   useEffect(() => {
     void loadSavedSchedule();
-  }, [loadSavedSchedule]);
+    void loadUserSubjects();
+  }, [loadSavedSchedule, loadUserSubjects]);
 
   const goToPrevWeek = () => {
     const newStart = new Date(currentWeekStart);
@@ -415,12 +438,16 @@ export default function PlannerPage() {
                 <LoadingSpinner size="md" text="Loading week…" />
               </div>
             ) : null}
-            <ScheduleGrid schedule={schedule} onToggleSession={toggleSession} />
+            <ScheduleGrid
+              schedule={schedule}
+              subjectColorMap={subjectColorMap}
+              onToggleSession={toggleSession}
+            />
           </div>
 
           <div className="xl:w-64 flex-shrink-0 space-y-4">
             <WeeklyStats schedule={schedule} />
-            <SubjectLegend />
+            <SubjectLegend subjects={userSubjects} colorMap={subjectColorMap} />
             <Button
               onClick={handleUpdateSchedule}
               className="w-full"

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlannerDaySchedule } from "@/lib/schedule-map";
+import { getSubjectColor, type SubjectColorStyle } from "@/lib/subject-colors";
 
 interface Session {
   id: string;
@@ -22,55 +23,6 @@ interface Session {
 }
 
 type DaySchedule = PlannerDaySchedule;
-
-const subjectColors: Record<
-  string,
-  { border: string; bg: string; bgHover: string; text: string; accent: string }
-> = {
-  Mathematics: {
-    border: "border-l-blue-500",
-    bg: "bg-blue-500/15",
-    bgHover: "bg-blue-500/25",
-    text: "text-blue-400",
-    accent: "#3b82f6",
-  },
-  Physics: {
-    border: "border-l-cyan-500",
-    bg: "bg-cyan-500/15",
-    bgHover: "bg-cyan-500/25",
-    text: "text-cyan-400",
-    accent: "#06b6d4",
-  },
-  Chemistry: {
-    border: "border-l-amber-500",
-    bg: "bg-amber-500/15",
-    bgHover: "bg-amber-500/25",
-    text: "text-amber-400",
-    accent: "#f59e0b",
-  },
-  Biology: {
-    border: "border-l-red-500",
-    bg: "bg-red-500/15",
-    bgHover: "bg-red-500/25",
-    text: "text-red-400",
-    accent: "#ef4444",
-  },
-  History: {
-    border: "border-l-emerald-500",
-    bg: "bg-emerald-500/15",
-    bgHover: "bg-emerald-500/25",
-    text: "text-emerald-400",
-    accent: "#10b981",
-  },
-};
-
-const defaultColors = {
-  border: "border-l-slate-500",
-  bg: "bg-slate-500/15",
-  bgHover: "bg-slate-500/25",
-  text: "text-slate-400",
-  accent: "#64748b",
-};
 
 // Time slots for full 24 hours
 const timeSlots = Array.from({ length: 24 }, (_, i) => {
@@ -86,12 +38,14 @@ function parseTime(timeStr: string): number {
 
 function SessionBlock({
   session,
+  subjectColorMap,
   onToggle,
   isOpen,
   onOpen,
   onClose,
 }: {
   session: Session;
+  subjectColorMap: Record<string, SubjectColorStyle>;
   onToggle: () => void;
   isOpen: boolean;
   onOpen: () => void;
@@ -99,7 +53,7 @@ function SessionBlock({
 }) {
   const blockRef = useRef<HTMLDivElement>(null);
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; openLeft: boolean } | null>(null);
-  const colors = subjectColors[session.subject] || defaultColors;
+  const colors = getSubjectColor(session.subject, subjectColorMap);
 
   // Calculate height based on duration (60 min = 48px which is the row height)
   const height = (session.duration / 60) * 48;
@@ -144,12 +98,17 @@ function SessionBlock({
         onClick={handleClick}
         className={cn(
           "h-full rounded-md border-l-[3px] px-2 py-1.5 cursor-pointer transition-all duration-200 overflow-hidden",
-          colors.border,
-          isOpen ? colors.bgHover : colors.bg,
-          session.completed && "opacity-60"
+          session.completed && "opacity-60",
         )}
+        style={{
+          borderLeftColor: colors.border,
+          backgroundColor: isOpen ? colors.bgHover : colors.bg,
+        }}
       >
-        <p className={cn("text-xs font-semibold truncate", colors.text)}>
+        <p
+          className="text-xs font-semibold truncate"
+          style={{ color: colors.text }}
+        >
           {session.subject}
         </p>
         <p
@@ -196,7 +155,10 @@ function SessionBlock({
               <p className="text-base font-semibold text-foreground leading-tight">
                 {session.topic}
               </p>
-              <p className={cn("text-sm font-medium mt-1", colors.text)}>
+              <p
+                className="text-sm font-medium mt-1"
+                style={{ color: colors.text }}
+              >
                 {session.subject}
               </p>
             </div>
@@ -261,9 +223,11 @@ function SessionBlock({
 
 function TimeGrid({
   schedule,
+  subjectColorMap,
   onToggleSession,
 }: {
   schedule: DaySchedule[];
+  subjectColorMap: Record<string, SubjectColorStyle>;
   onToggleSession: (dayIndex: number, sessionId: string) => void;
 }) {
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
@@ -354,6 +318,7 @@ function TimeGrid({
                   <SessionBlock
                     key={session.id}
                     session={session}
+                    subjectColorMap={subjectColorMap}
                     onToggle={() => onToggleSession(dayData.dayIndex, session.id)}
                     isOpen={openSessionId === session.id}
                     onOpen={() => setOpenSessionId(session.id)}
@@ -372,10 +337,20 @@ function TimeGrid({
 
 export function ScheduleGrid({
   schedule,
+  subjectColorMap,
   onToggleSession,
 }: {
   schedule: DaySchedule[];
+  subjectColorMap?: Record<string, SubjectColorStyle>;
   onToggleSession: (dayIndex: number, sessionId: string) => void;
 }) {
-  return <TimeGrid schedule={schedule} onToggleSession={onToggleSession} />;
+  return (
+    <TimeGrid
+      schedule={schedule}
+      subjectColorMap={subjectColorMap ?? {}}
+      onToggleSession={onToggleSession}
+    />
+  );
 }
+
+export type { SubjectColorStyle };

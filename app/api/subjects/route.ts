@@ -1,5 +1,6 @@
 import { jsonError, jsonOk, requireAuth } from "@/lib/api";
 import { getAuthedSupabase } from "@/lib/supabase-server";
+import { hasDuplicateSubjectName } from "@/lib/subjects";
 import type { Subject } from "@/types";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -102,6 +103,19 @@ export async function POST(request: Request) {
     return jsonError(parsed.message);
   }
 
+  const { data: existingSubjects, error: existingError } = await supabase
+    .from("subjects")
+    .select("name")
+    .eq("user_id", userId);
+
+  if (existingError) {
+    return jsonError(existingError.message, 500);
+  }
+
+  if (hasDuplicateSubjectName(parsed.name, existingSubjects ?? [])) {
+    return jsonError("You already have a subject with this name", 409);
+  }
+
   const { data, error } = await supabase
     .from("subjects")
     .insert({
@@ -114,6 +128,9 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    if (error.code === "23505") {
+      return jsonError("You already have a subject with this name", 409);
+    }
     return jsonError(error.message, 500);
   }
 
