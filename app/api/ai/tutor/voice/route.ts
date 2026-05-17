@@ -14,6 +14,8 @@ import { buildTutorSpeechPayload } from "@/lib/tutor-tts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TutorMessage } from "@/types";
 
+export const runtime = "nodejs";
+
 interface VoiceTutorBody {
   message?: string;
   history?: Message[];

@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { readFileSync } from "node:fs";
 
 const ENDPOINT =
   "http://127.0.0.1:7571/ingest/194d7113-fc03-43c9-a6df-3c5e79441369";

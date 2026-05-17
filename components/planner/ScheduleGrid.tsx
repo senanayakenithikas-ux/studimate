@@ -1,14 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
 import {
   BookOpen,
   Calendar,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Target,
 } from "lucide-react";
@@ -109,7 +106,6 @@ function SessionBlock({
 
   // Calculate top position based on start time
   const startMinutes = parseTime(session.startTime);
-  const baseMinutes = 0; // 00:00 midnight
   const topOffset = (startMinutes / 60) * 48;
 
   const handleClick = (e: React.MouseEvent) => {
@@ -262,131 +258,6 @@ function SessionBlock({
   );
 }
 
-function WeekNavigator({
-  weekLabel,
-  onPrev,
-  onNext,
-}: {
-  weekLabel: string;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 rounded-lg"
-        onClick={onPrev}
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-      <div className="flex items-center gap-2 text-sm font-medium text-foreground min-w-[180px] justify-center">
-        <Calendar className="h-4 w-4 text-muted-foreground" />
-        {weekLabel}
-      </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 rounded-lg"
-        onClick={onNext}
-      >
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
-function SubjectLegend() {
-  const subjects = ["Mathematics", "Physics", "Chemistry", "Biology", "History"];
-  return (
-    <div className="bg-card/50 rounded-xl border border-border p-4">
-      <h3 className="text-sm font-semibold text-foreground mb-3">Subjects</h3>
-      <div className="space-y-2.5">
-        {subjects.map((subject) => {
-          const colors = subjectColors[subject] || defaultColors;
-          return (
-            <div key={subject} className="flex items-center gap-2.5">
-              <div
-                className="w-3 h-3 rounded"
-                style={{ backgroundColor: colors.accent }}
-              />
-              <span className="text-sm text-foreground">{subject}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function WeeklyStats({ schedule }: { schedule: DaySchedule[] }) {
-  const totalSessions = schedule.reduce(
-    (acc, day) => acc + day.sessions.length,
-    0
-  );
-  const completedSessions = schedule.reduce(
-    (acc, day) => acc + day.sessions.filter((s) => s.completed).length,
-    0
-  );
-  const totalMinutes = schedule.reduce(
-    (acc, day) => acc + day.sessions.reduce((sum, s) => sum + s.duration, 0),
-    0
-  );
-  const completedMinutes = schedule.reduce(
-    (acc, day) =>
-      acc +
-      day.sessions
-        .filter((s) => s.completed)
-        .reduce((sum, s) => sum + s.duration, 0),
-    0
-  );
-
-  const progressPercent =
-    totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
-
-  return (
-    <div className="bg-card/50 rounded-xl border border-border p-4">
-      <h3 className="text-sm font-semibold text-foreground mb-3">
-        Weekly Progress
-      </h3>
-      <div className="space-y-4">
-        <div>
-          <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-muted-foreground">Sessions</span>
-            <span className="text-foreground font-medium">
-              {completedSessions}/{totalSessions}
-            </span>
-          </div>
-          <div className="h-2 bg-secondary rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-secondary/50 rounded-lg p-2.5 text-center">
-            <p className="text-lg font-bold text-foreground">
-              {Math.round(totalMinutes / 60)}h
-            </p>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
-              Total
-            </p>
-          </div>
-          <div className="bg-secondary/50 rounded-lg p-2.5 text-center">
-            <p className="text-lg font-bold text-emerald-400">
-              {Math.round(completedMinutes / 60)}h
-            </p>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
-              Done
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function TimeGrid({
   schedule,
@@ -438,7 +309,7 @@ function TimeGrid({
 
       {/* Time Grid */}
       <div className="relative">
-        {timeSlots.map((time, timeIndex) => (
+        {timeSlots.map((time) => (
           <div
             key={time}
             className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-border/50 last:border-b-0"

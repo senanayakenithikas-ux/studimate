@@ -37,7 +37,6 @@ export default function QuizPage() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [results, setResults] = useState<QuizAnswerResult[]>([]);
-  const [showExplanation, setShowExplanation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const question = questions[currentQuestion];
@@ -87,7 +86,6 @@ export default function QuizPage() {
     setCurrentQuestion(0);
     setResults([]);
     setSelectedAnswer(null);
-    setShowExplanation(false);
     try {
       const data = await apiFetch<{ questions: QuizQuestion[]; quiz_id?: string }>(
         "/api/ai/quiz",
@@ -116,7 +114,6 @@ export default function QuizPage() {
 
   const handleCheckAnswer = () => {
     if (!question || selectedAnswer === null) return;
-    setShowExplanation(true);
     setStep("answer");
     const isCorrect = selectedAnswer === question.correctIndex;
     setResults([
@@ -129,7 +126,6 @@ export default function QuizPage() {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
       setSelectedAnswer(null);
-      setShowExplanation(false);
       setStep("quiz");
     } else {
       setStep("results");
@@ -143,7 +139,6 @@ export default function QuizPage() {
     setSelectedAnswer(null);
     setQuestions([]);
     setResults([]);
-    setShowExplanation(false);
     setError(null);
   };
 

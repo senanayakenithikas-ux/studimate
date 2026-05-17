@@ -12,6 +12,10 @@ export interface MiniMaxEnvConfig {
 const DEFAULT_API_URL = "https://api.minimax.io/v1/text/chatcompletion_v2";
 const DEFAULT_MODEL = "MiniMax-M2.7";
 
+export function isMiniMaxMockEnabled(): boolean {
+  return process.env.MINIMAX_USE_MOCK === "true";
+}
+
 export function getMiniMaxEnvConfig(): MiniMaxEnvConfig {
   const apiKey = process.env.MINIMAX_API_KEY?.trim() ?? "";
   if (!apiKey) {

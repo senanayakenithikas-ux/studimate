@@ -49,7 +49,6 @@ function buildTranscriptFromResults(
 }
 
 export function VoiceChat({ materialId, materialName }: VoiceChatProps) {
-  const [status, setStatus] = useState<VoiceStatus>("idle");
   const [interim, setInterim] = useState("");
   const [lines, setLines] = useState<TranscriptLine[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +61,9 @@ export function VoiceChat({ materialId, materialName }: VoiceChatProps) {
   const listeningRef = useRef(false);
 
   const supported = isSpeechRecognitionSupported();
+  const [status, setStatus] = useState<VoiceStatus>(
+    supported ? "idle" : "unsupported",
+  );
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -71,16 +73,13 @@ export function VoiceChat({ materialId, materialName }: VoiceChatProps) {
   }, []);
 
   useEffect(() => {
-    if (!supported) {
-      setStatus("unsupported");
-    }
     return () => {
       clearSilenceTimer();
       listeningRef.current = false;
       recognitionRef.current?.abort();
       stopSpeaking();
     };
-  }, [supported, clearSilenceTimer]);
+  }, [clearSilenceTimer]);
 
   const sendToTutor = useCallback(
     async (userText: string) => {

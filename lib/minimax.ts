@@ -4,14 +4,17 @@
   type PlannerContext,
 } from "@/lib/planner-context";
 import { buildPlannerMiniMaxPrompt } from "@/lib/planner-minimax-prompt";
-import { getMiniMaxEnvConfig, logMiniMaxEnvStatus } from "@/lib/minimax-env";
+import {
+  getMiniMaxEnvConfig,
+  isMiniMaxMockEnabled,
+  logMiniMaxEnvStatus,
+} from "@/lib/minimax-env";
 import {
   buildTutorSystemPrompt,
   buildTutorVoiceSystemPrompt,
 } from "@/lib/tutor-minimax-prompt";
 import {
   buildQuizMiniMaxPrompt,
-  formatQuizPromptForLog,
   QUIZ_MATERIAL_SLICE,
 } from "@/lib/quiz-minimax-prompt";
 import type { QuizQuestion, WeeklySchedule } from "@/types";
@@ -91,19 +94,6 @@ export function getMiniMaxErrorMessage(error: unknown): string {
     return error.message;
   }
   return "AI service unavailable";
-}
-
-function shouldUseMockFallback(error: unknown): boolean {
-  if (process.env.MINIMAX_USE_MOCK === "true") {
-    return true;
-  }
-  if (process.env.NODE_ENV !== "development") {
-    return false;
-  }
-  return (
-    error instanceof MiniMaxError &&
-    (error.statusCode === 1008 || error.statusCode === 2049)
-  );
 }
 
 interface MiniMaxChatMessage {
@@ -567,12 +557,8 @@ export function assertUsableStudyText(text: string): void {
   }
 }
 
-function shouldUseMiniMaxMock(): boolean {
-  return process.env.MINIMAX_USE_MOCK === "true";
-}
-
 function shouldUseQuizMockFallback(): boolean {
-  return shouldUseMiniMaxMock();
+  return isMiniMaxMockEnabled();
 }
 
 function mockStudyPlanFromContext(context: PlannerContext): Schedule[] {
@@ -612,7 +598,7 @@ export async function generateStudyPlan(
   context: PlannerContext,
 ): Promise<Schedule[]> {
   try {
-    if (shouldUseMiniMaxMock()) {
+    if (isMiniMaxMockEnabled()) {
       return mockStudyPlanFromContext(context);
     }
 

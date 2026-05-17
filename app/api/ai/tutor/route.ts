@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { jsonError, jsonOk } from "@/lib/api";
+import { jsonOk } from "@/lib/api";
 import {
   getMiniMaxErrorMessage,
   MiniMaxError,
@@ -14,6 +14,8 @@ import { buildTutorSpeechPayload } from "@/lib/tutor-tts";
 import { getAuthedSupabase } from "@/lib/supabase-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TutorMessage } from "@/types";
+
+export const runtime = "nodejs";
 
 interface PostTutorBody {
   session_id?: string;

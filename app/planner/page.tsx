@@ -1,38 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { ScheduleGrid } from "@/components/planner/ScheduleGrid";
 import { EmptySchedule } from "@/components/empty-state";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { apiFetch } from "@/lib/client-fetch";
 import {
   weeklyScheduleToDaySchedule,
   type PlannerDaySchedule,
 } from "@/lib/schedule-map";
 import type { WeeklySchedule } from "@/types";
-import {
-  RefreshCw,
-  Check,
-  Clock,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  BookOpen,
-  Target,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-
-interface Session {
-  id: number;
-  subject: string;
-  topic: string;
-  duration: number;
-  startTime: string;
-  completed: boolean;
-}
+import { RefreshCw, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
 type DaySchedule = PlannerDaySchedule;
 
@@ -173,7 +153,6 @@ function WeeklyStats({ schedule }: { schedule: DaySchedule[] }) {
 }
 
 export default function PlannerPage() {
-  const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasSchedule, setHasSchedule] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -266,7 +245,7 @@ export default function PlannerPage() {
             Your AI-generated weekly study schedule
           </p>
         </div>
-        {hasSchedule && !isLoading && !isGenerating && (
+        {hasSchedule && !isGenerating && (
           <WeekNavigator
             weekLabel={getWeekLabel()}
             onPrev={goToPrevWeek}
@@ -279,11 +258,7 @@ export default function PlannerPage() {
         <p className="mb-4 text-sm text-destructive">{error}</p>
       ) : null}
 
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <LoadingSpinner size="lg" text="Loading your schedule..." />
-        </div>
-      ) : isGenerating ? (
+      {isGenerating ? (
         <div className="flex flex-col items-center justify-center py-20">
           <LoadingSpinner size="lg" text="Generating your schedule..." />
         </div>

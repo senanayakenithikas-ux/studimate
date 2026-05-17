@@ -13,6 +13,8 @@ export function asSessionCookieOptions(
   if (options?.maxAge === 0) {
     return { ...SESSION_COOKIE_OPTIONS, ...options };
   }
-  const { maxAge, expires, ...rest } = options ?? {};
+  const rest = { ...(options ?? {}) };
+  delete rest.maxAge;
+  delete rest.expires;
   return { ...SESSION_COOKIE_OPTIONS, ...rest };
 }

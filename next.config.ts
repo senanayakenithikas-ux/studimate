@@ -1,10 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
   images: {
     unoptimized: true,
   },
