@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { TutorMessageBody } from "@/components/tutor/TutorMessageBody";
 import { unlockAudioPlayback } from "@/lib/tutor-voice";
 import type { TutorMessage } from "@/types";
-import { ChevronDown, FileText, Mic, Send, Sparkles, Volume2 } from "lucide-react";
+import { ChevronDown, FileText, Send, Sparkles, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MaterialOption {
@@ -83,17 +83,20 @@ function MessageBubble({
         ) : (
           <div className="space-y-2">
             <TutorMessageBody content={message.content} />
-            {speech && onReplay ? (
+            {onReplay ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="h-7 gap-1 px-2 text-xs text-indigo-400 hover:text-indigo-300"
                 disabled={isSpeaking}
-                onClick={onReplay}
+                onClick={() => {
+                  unlockAudioPlayback();
+                  onReplay();
+                }}
               >
                 <Volume2 className="h-3.5 w-3.5" />
-                {isSpeaking ? "Playing…" : "Listen again"}
+                {isSpeaking ? "Playing…" : speech ? "Listen again" : "Listen"}
               </Button>
             ) : null}
           </div>
@@ -153,8 +156,8 @@ export function ChatWindow({
           </h1>
           <p className="text-sm text-muted-foreground">
             {readAloudEnabled
-              ? "Read-aloud on — tutor replies use MiniMax voice"
-              : "Tap the mic to hear tutor replies (MiniMax voice)"}
+              ? "Read-aloud on — replies play with MiniMax voice"
+              : "Tap the speaker to hear tutor replies (MiniMax voice)"}
           </p>
         </div>
 
@@ -216,8 +219,8 @@ export function ChatWindow({
                   Start a conversation
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  Ask about your study materials. Turn on the mic below to hear
-                  replies read aloud with MiniMax voice.
+                  Ask about your study materials. Use the speaker button below to
+                  hear replies read aloud with MiniMax voice.
                 </p>
               </div>
             )}
@@ -231,7 +234,7 @@ export function ChatWindow({
                 onReplay={
                   readAloudEnabled &&
                   onReplay &&
-                  speechByMessageId[message.id]
+                  message.role === "assistant"
                     ? () => onReplay(message.id)
                     : undefined
                 }
@@ -282,7 +285,7 @@ export function ChatWindow({
                   : "border-border text-muted-foreground hover:text-foreground",
               )}
             >
-              <Mic className="w-4 h-4" />
+              <Volume2 className="w-4 h-4" />
             </Button>
             <Button
               onClick={() => {

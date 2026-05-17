@@ -12,8 +12,22 @@ import {
   stripForSpeech,
   unlockAudioPlayback,
 } from "@/lib/tutor-voice";
-import type { Material, Subject, TutorMessage, TutorPostResponse } from "@/types";
+import { useToast } from "@/hooks/use-toast";
+import type {
+  Material,
+  Subject,
+  TutorMessage,
+  TutorPostResponse,
+  TutorSpeechFields,
+} from "@/types";
 import { cn } from "@/lib/utils";
+
+const READ_ALOUD_STORAGE_KEY = "studimate-tutor-read-aloud";
+
+function readAloudPreference(): boolean {
+  if (typeof window === "undefined") return true;
+  return sessionStorage.getItem(READ_ALOUD_STORAGE_KEY) !== "false";
+}
 
 type TutorMode = "text" | "voice";
 
@@ -30,6 +44,7 @@ const EMPTY_MATERIAL: TutorMaterialItem = {
 };
 
 export default function TutorPage() {
+  const { toast } = useToast();
   const [mode, setMode] = useState<TutorMode>("text");
   const [messages, setMessages] = useState<TutorMessage[]>([]);
   const [input, setInput] = useState("");
@@ -43,7 +58,7 @@ export default function TutorPage() {
     Record<string, TutorSpeechCache>
   >({});
   const [speakingId, setSpeakingId] = useState<string | null>(null);
-  const [readAloudEnabled, setReadAloudEnabled] = useState(false);
+  const [readAloudEnabled, setReadAloudEnabled] = useState(readAloudPreference);
   const speakingIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -100,8 +115,13 @@ export default function TutorPage() {
           audioBase64 ?? null,
           "audio/mpeg",
         );
-      } catch {
-        // Text remains visible
+      } catch (err) {
+        toast({
+          variant: "destructive",
+          title: "Could not play audio",
+          description:
+            err instanceof Error ? err.message : "Try tapping Listen on the reply.",
+        });
       } finally {
         if (speakingIdRef.current === messageId) {
           speakingIdRef.current = null;
@@ -109,14 +129,46 @@ export default function TutorPage() {
         }
       }
     },
-    [],
+    [toast],
   );
 
   const handleReplay = useCallback(
-    (messageId: string) => {
-      const speech = speechByMessageId[messageId];
+    async (messageId: string) => {
       const message = messages.find((m) => m.id === messageId);
-      if (!speech || !message) return;
+      if (!message || message.role !== "assistant") return;
+
+      unlockAudioPlayback();
+
+      let speech = speechByMessageId[messageId];
+      if (!speech) {
+        try {
+          const data = await apiFetch<TutorSpeechFields>("/api/ai/tutor/speech", {
+            method: "POST",
+            body: JSON.stringify({ text: message.content }),
+          });
+          const spoken =
+            data.spokenText?.trim() || stripForSpeech(message.content);
+          speech = {
+            audioBase64: data.audioBase64 ?? null,
+            spokenText: spoken,
+          };
+          setSpeechByMessageId((prev) => ({
+            ...prev,
+            [messageId]: speech!,
+          }));
+        } catch (err) {
+          toast({
+            variant: "destructive",
+            title: "Could not load voice",
+            description:
+              err instanceof Error
+                ? err.message
+                : "MiniMax text-to-speech is unavailable.",
+          });
+          return;
+        }
+      }
+
       void playReply(
         messageId,
         message.content,
@@ -124,17 +176,21 @@ export default function TutorPage() {
         speech.spokenText,
       );
     },
-    [messages, speechByMessageId, playReply],
+    [messages, speechByMessageId, playReply, toast],
   );
 
   const handleReadAloudToggle = useCallback(() => {
     setReadAloudEnabled((on) => {
-      if (on) {
-        stopSpeaking();
-        return false;
+      const next = !on;
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(READ_ALOUD_STORAGE_KEY, next ? "true" : "false");
       }
-      unlockAudioPlayback();
-      return true;
+      if (!next) {
+        stopSpeaking();
+      } else {
+        unlockAudioPlayback();
+      }
+      return next;
     });
   }, []);
 
@@ -188,14 +244,14 @@ export default function TutorPage() {
       if (readAloudEnabled) {
         const spoken =
           data.spokenText?.trim() || stripForSpeech(data.message.content);
+        setSpeechByMessageId((prev) => ({
+          ...prev,
+          [data.message.id]: {
+            audioBase64: data.audioBase64 ?? null,
+            spokenText: spoken,
+          },
+        }));
         if (spoken || data.audioBase64) {
-          setSpeechByMessageId((prev) => ({
-            ...prev,
-            [data.message.id]: {
-              audioBase64: data.audioBase64 ?? null,
-              spokenText: spoken,
-            },
-          }));
           void playReply(
             data.message.id,
             data.message.content,
@@ -261,7 +317,9 @@ export default function TutorPage() {
             onReadAloudToggle={handleReadAloudToggle}
             onInputChange={setInput}
             onSend={() => void handleSend()}
-            onReplay={readAloudEnabled ? handleReplay : undefined}
+            onReplay={
+              readAloudEnabled ? (messageId) => void handleReplay(messageId) : undefined
+            }
             onSelectMaterial={handleSelectMaterial}
           />
         ) : (

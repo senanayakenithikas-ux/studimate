@@ -1,4 +1,5 @@
 import { MiniMaxError } from "@/lib/minimax";
+import { getMiniMaxEnvConfig, logMiniMaxEnvStatus } from "@/lib/minimax-env";
 
 const MINIMAX_TTS_URL =
   process.env.MINIMAX_TTS_URL?.trim() ?? "https://api.minimax.io/v1/t2a_v2";
@@ -31,24 +32,27 @@ interface T2aV2Response {
   };
 }
 
-function getApiKey(): string {
-  const apiKey = process.env.MINIMAX_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("MINIMAX_API_KEY is not configured");
-  }
-  return apiKey;
-}
-
 function buildHeaders(): Record<string, string> {
+  const config = getMiniMaxEnvConfig();
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${getApiKey()}`,
+    Authorization: `Bearer ${config.apiKey}`,
     "Content-Type": "application/json",
   };
-  const groupId = process.env.MINIMAX_GROUP_ID?.trim();
-  if (groupId) {
-    headers["Group-Id"] = groupId;
+  if (config.groupId) {
+    headers["Group-Id"] = config.groupId;
   }
   return headers;
+}
+
+function decodeAudioPayload(raw: string): Buffer {
+  const trimmed = raw.replace(/\s+/g, "");
+  if (!trimmed) {
+    throw new Error("MiniMax TTS response missing audio data");
+  }
+  if (/^[0-9a-fA-F]+$/.test(trimmed) && trimmed.length % 2 === 0) {
+    return Buffer.from(trimmed, "hex");
+  }
+  return Buffer.from(trimmed, "base64");
 }
 
 /**
@@ -67,6 +71,8 @@ export async function synthesizeSpeech(
   if (process.env.MINIMAX_USE_MOCK === "true") {
     return Buffer.alloc(0);
   }
+
+  logMiniMaxEnvStatus("tts");
 
   const res = await fetch(MINIMAX_TTS_URL, {
     method: "POST",
@@ -108,10 +114,10 @@ export async function synthesizeSpeech(
     );
   }
 
-  const hex = data.data?.audio;
-  if (!hex || typeof hex !== "string") {
+  const audioPayload = data.data?.audio;
+  if (!audioPayload || typeof audioPayload !== "string") {
     throw new Error("MiniMax TTS response missing audio data");
   }
 
-  return Buffer.from(hex, "hex");
+  return decodeAudioPayload(audioPayload);
 }

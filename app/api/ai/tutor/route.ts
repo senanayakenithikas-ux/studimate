@@ -228,7 +228,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       createdAt: new Date().toISOString(),
     };
 
-    const includeSpeech = body.include_speech !== false;
+    const includeSpeech = body.include_speech === true;
     const speech = includeSpeech
       ? await buildTutorSpeechPayload(aiReply, "hd")
       : {

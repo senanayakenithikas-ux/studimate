@@ -63,7 +63,16 @@ export function stopSpeaking(): void {
   stopHtmlAudio();
 }
 
-/** Play MP3 from base64 (MiniMax TTS). */
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/** Play MP3 from base64 (MiniMax TTS). Uses blob URLs for large responses. */
 export function playAudioBase64(
   base64: string,
   mime = "audio/mpeg",
@@ -79,17 +88,38 @@ export function playAudioBase64(
       window.speechSynthesis.cancel();
     }
 
-    const audio = new Audio(`data:${mime};base64,${base64}`);
+    let objectUrl: string | null = null;
+    const audio = new Audio();
+
+    const cleanup = () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
+    };
+
+    try {
+      const bytes = base64ToBytes(base64);
+      const blob = new Blob([bytes], { type: mime });
+      objectUrl = URL.createObjectURL(blob);
+      audio.src = objectUrl;
+    } catch {
+      audio.src = `data:${mime};base64,${base64}`;
+    }
+
     currentAudio = audio;
     audio.onended = () => {
+      cleanup();
       currentAudio = null;
       resolve();
     };
     audio.onerror = () => {
+      cleanup();
       currentAudio = null;
       reject(new Error("Failed to play tutor audio"));
     };
     void audio.play().catch((err) => {
+      cleanup();
       currentAudio = null;
       reject(err);
     });
