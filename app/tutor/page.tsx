@@ -1,20 +1,155 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { ChatWindow } from "@/components/tutor/ChatWindow";
-import { mockMaterials } from "@/lib/mock-data";
+import type { TutorSpeechCache } from "@/components/tutor/ChatWindow";
+import { VoiceChat } from "@/components/tutor/VoiceChat";
 import { apiFetch } from "@/lib/client-fetch";
-import type { TutorMessage } from "@/types";
+import {
+  playTutorSpeech,
+  stopSpeaking,
+  stripForSpeech,
+  unlockAudioPlayback,
+} from "@/lib/tutor-voice";
+import type { Material, Subject, TutorMessage, TutorPostResponse } from "@/types";
+import { cn } from "@/lib/utils";
+
+type TutorMode = "text" | "voice";
+
+interface TutorMaterialItem {
+  id: string;
+  name: string;
+  subject: string;
+}
+
+const EMPTY_MATERIAL: TutorMaterialItem = {
+  id: "",
+  name: "No materials yet",
+  subject: "Upload a PDF first",
+};
 
 export default function TutorPage() {
+  const [mode, setMode] = useState<TutorMode>("text");
   const [messages, setMessages] = useState<TutorMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [selectedMaterial, setSelectedMaterial] = useState(mockMaterials[0]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [materials, setMaterials] = useState<TutorMaterialItem[]>([]);
+  const [selectedMaterial, setSelectedMaterial] =
+    useState<TutorMaterialItem>(EMPTY_MATERIAL);
+  const [materialsLoading, setMaterialsLoading] = useState(true);
+  const [speechByMessageId, setSpeechByMessageId] = useState<
+    Record<string, TutorSpeechCache>
+  >({});
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [readAloudEnabled, setReadAloudEnabled] = useState(false);
+  const speakingIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    async function loadMaterials() {
+      setMaterialsLoading(true);
+      try {
+        const [subjects, allMaterials] = await Promise.all([
+          apiFetch<Subject[]>("/api/subjects"),
+          apiFetch<Material[]>("/api/materials?all=true"),
+        ]);
+
+        const subjectNameById = new Map(
+          subjects.map((s) => [s.id, s.name] as const),
+        );
+
+        const mapped: TutorMaterialItem[] = allMaterials.map((m) => ({
+          id: m.id,
+          name: m.title,
+          subject: subjectNameById.get(m.subjectId) ?? "Subject",
+        }));
+
+        setMaterials(mapped);
+        if (mapped.length > 0) {
+          setSelectedMaterial((prev) =>
+            prev.id && mapped.some((m) => m.id === prev.id) ? prev : mapped[0],
+          );
+        } else {
+          setSelectedMaterial(EMPTY_MATERIAL);
+        }
+      } catch {
+        setMaterials([]);
+        setSelectedMaterial(EMPTY_MATERIAL);
+      } finally {
+        setMaterialsLoading(false);
+      }
+    }
+
+    void loadMaterials();
+  }, []);
+
+  const playReply = useCallback(
+    async (
+      messageId: string,
+      content: string,
+      audioBase64: string | null | undefined,
+      spokenText: string | undefined,
+    ) => {
+      stopSpeaking();
+      speakingIdRef.current = messageId;
+      setSpeakingId(messageId);
+      try {
+        await playTutorSpeech(
+          spokenText ?? stripForSpeech(content),
+          audioBase64 ?? null,
+          "audio/mpeg",
+        );
+      } catch {
+        // Text remains visible
+      } finally {
+        if (speakingIdRef.current === messageId) {
+          speakingIdRef.current = null;
+          setSpeakingId(null);
+        }
+      }
+    },
+    [],
+  );
+
+  const handleReplay = useCallback(
+    (messageId: string) => {
+      const speech = speechByMessageId[messageId];
+      const message = messages.find((m) => m.id === messageId);
+      if (!speech || !message) return;
+      void playReply(
+        messageId,
+        message.content,
+        speech.audioBase64,
+        speech.spokenText,
+      );
+    },
+    [messages, speechByMessageId, playReply],
+  );
+
+  const handleReadAloudToggle = useCallback(() => {
+    setReadAloudEnabled((on) => {
+      if (on) {
+        stopSpeaking();
+        return false;
+      }
+      unlockAudioPlayback();
+      return true;
+    });
+  }, []);
+
+  const handleSelectMaterial = (material: TutorMaterialItem) => {
+    if (material.id === selectedMaterial.id) return;
+    setSelectedMaterial(material);
+    setSessionId(null);
+    setMessages([]);
+    setSpeechByMessageId({});
+    stopSpeaking();
+  };
 
   const handleSend = async () => {
-    if (!input.trim() || isTyping) return;
+    if (!input.trim() || isTyping || materialsLoading) return;
+    if (!selectedMaterial.id) return;
 
     const content = input.trim();
     const userMessage: TutorMessage = {
@@ -24,16 +159,51 @@ export default function TutorPage() {
       createdAt: new Date().toISOString(),
     };
 
+    if (readAloudEnabled) {
+      unlockAudioPlayback();
+    }
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsTyping(true);
 
     try {
-      const reply = await apiFetch<TutorMessage>("/api/ai/tutor", {
+      const body: Record<string, string | boolean> = {
+        message: content,
+        include_speech: readAloudEnabled,
+      };
+      if (sessionId) {
+        body.session_id = sessionId;
+      } else if (selectedMaterial.id) {
+        body.material_id = selectedMaterial.id;
+      }
+
+      const data = await apiFetch<TutorPostResponse>("/api/ai/tutor", {
         method: "POST",
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify(body),
       });
-      setMessages((prev) => [...prev, reply]);
+
+      setSessionId(data.sessionId);
+      setMessages((prev) => [...prev, data.message]);
+
+      if (readAloudEnabled) {
+        const spoken =
+          data.spokenText?.trim() || stripForSpeech(data.message.content);
+        if (spoken || data.audioBase64) {
+          setSpeechByMessageId((prev) => ({
+            ...prev,
+            [data.message.id]: {
+              audioBase64: data.audioBase64 ?? null,
+              spokenText: spoken,
+            },
+          }));
+          void playReply(
+            data.message.id,
+            data.message.content,
+            data.audioBase64,
+            data.spokenText,
+          );
+        }
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -52,18 +222,82 @@ export default function TutorPage() {
     }
   };
 
+  const pickerMaterials =
+    materials.length > 0 ? materials : [EMPTY_MATERIAL];
+
   return (
     <AppLayout title="AI Tutor">
-      <ChatWindow
-        messages={messages}
-        input={input}
-        isTyping={isTyping}
-        materials={mockMaterials}
-        selectedMaterial={selectedMaterial}
-        onInputChange={setInput}
-        onSend={() => void handleSend()}
-        onSelectMaterial={setSelectedMaterial}
-      />
+      <div className="space-y-4">
+        <div
+          className="inline-flex rounded-lg border border-border bg-muted/30 p-1"
+          role="tablist"
+          aria-label="Tutor mode"
+        >
+          <ModeTab
+            active={mode === "text"}
+            onClick={() => setMode("text")}
+            label="Text chat"
+          />
+          <ModeTab
+            active={mode === "voice"}
+            onClick={() => {
+              stopSpeaking();
+              setMode("voice");
+            }}
+            label="Voice chat"
+          />
+        </div>
+
+        {mode === "text" ? (
+          <ChatWindow
+            messages={messages}
+            input={input}
+            isTyping={isTyping}
+            materials={pickerMaterials}
+            selectedMaterial={selectedMaterial}
+            speechByMessageId={speechByMessageId}
+            speakingId={speakingId}
+            readAloudEnabled={readAloudEnabled}
+            onReadAloudToggle={handleReadAloudToggle}
+            onInputChange={setInput}
+            onSend={() => void handleSend()}
+            onReplay={readAloudEnabled ? handleReplay : undefined}
+            onSelectMaterial={handleSelectMaterial}
+          />
+        ) : (
+          <VoiceChat
+            materialId={selectedMaterial.id || undefined}
+            materialName={selectedMaterial.name}
+          />
+        )}
+      </div>
     </AppLayout>
+  );
+}
+
+function ModeTab({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "rounded-md px-4 py-2 text-sm font-medium transition",
+        active
+          ? "bg-indigo-600 text-white shadow-sm"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
   );
 }

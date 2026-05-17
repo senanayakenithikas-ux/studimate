@@ -65,3 +65,26 @@ export function hasAppSession(): boolean {
 }
 
 export const APP_SESSION_STORAGE_KEY = SESSION_KEY;
+
+const TAB_CLOSE_LOGOUT_DELAY_MS = 200;
+
+let pendingTabCloseLogoutId: ReturnType<typeof setTimeout> | null = null;
+
+export function hasOpenTabs(): boolean {
+  return readTabs().length > 0;
+}
+
+export function cancelPendingTabCloseLogout(): void {
+  if (pendingTabCloseLogoutId !== null) {
+    clearTimeout(pendingTabCloseLogoutId);
+    pendingTabCloseLogoutId = null;
+  }
+}
+
+export function scheduleTabCloseLogout(callback: () => void): void {
+  cancelPendingTabCloseLogout();
+  pendingTabCloseLogoutId = setTimeout(() => {
+    pendingTabCloseLogoutId = null;
+    callback();
+  }, TAB_CLOSE_LOGOUT_DELAY_MS);
+}

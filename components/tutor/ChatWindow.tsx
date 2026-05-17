@@ -3,14 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { TutorMessageBody } from "@/components/tutor/TutorMessageBody";
+import { unlockAudioPlayback } from "@/lib/tutor-voice";
 import type { TutorMessage } from "@/types";
-import { ChevronDown, FileText, Send, Sparkles } from "lucide-react";
+import { ChevronDown, FileText, Mic, Send, Sparkles, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MaterialOption {
-  id: number;
+  id: string;
   name: string;
   subject: string;
+}
+
+export interface TutorSpeechCache {
+  audioBase64: string | null;
+  spokenText: string;
 }
 
 interface ChatWindowProps {
@@ -19,8 +26,13 @@ interface ChatWindowProps {
   isTyping: boolean;
   materials: MaterialOption[];
   selectedMaterial: MaterialOption;
+  speechByMessageId?: Record<string, TutorSpeechCache>;
+  speakingId?: string | null;
+  readAloudEnabled: boolean;
+  onReadAloudToggle: () => void;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onReplay?: (messageId: string) => void;
   onSelectMaterial: (material: MaterialOption) => void;
 }
 
@@ -43,7 +55,17 @@ function TypingIndicator() {
   );
 }
 
-function MessageBubble({ message }: { message: TutorMessage }) {
+function MessageBubble({
+  message,
+  speech,
+  isSpeaking,
+  onReplay,
+}: {
+  message: TutorMessage;
+  speech?: TutorSpeechCache;
+  isSpeaking: boolean;
+  onReplay?: () => void;
+}) {
   const isUser = message.role === "user";
 
   return (
@@ -56,7 +78,26 @@ function MessageBubble({ message }: { message: TutorMessage }) {
             : "bg-card border border-border text-foreground",
         )}
       >
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        {isUser ? (
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        ) : (
+          <div className="space-y-2">
+            <TutorMessageBody content={message.content} />
+            {speech && onReplay ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs text-indigo-400 hover:text-indigo-300"
+                disabled={isSpeaking}
+                onClick={onReplay}
+              >
+                <Volume2 className="h-3.5 w-3.5" />
+                {isSpeaking ? "Playing…" : "Listen again"}
+              </Button>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -68,8 +109,13 @@ export function ChatWindow({
   isTyping,
   materials,
   selectedMaterial,
+  speechByMessageId = {},
+  speakingId = null,
+  readAloudEnabled,
+  onReadAloudToggle,
   onInputChange,
   onSend,
+  onReplay,
   onSelectMaterial,
 }: ChatWindowProps) {
   const [showMaterialPicker, setShowMaterialPicker] = useState(false);
@@ -92,24 +138,27 @@ export function ChatWindow({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      unlockAudioPlayback();
       onSend();
     }
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)] flex flex-col">
-      <div className="flex items-center justify-between pb-4 border-b border-border mb-4">
-        <div>
+    <div className="h-[calc(100vh-10rem)] md:h-[calc(100vh-6rem)] flex flex-col">
+      <div className="flex items-center justify-between pb-4 border-b border-border mb-4 gap-3">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-indigo-400" />
+            <Sparkles className="w-5 h-5 text-indigo-400 shrink-0" />
             AI Tutor
           </h1>
           <p className="text-sm text-muted-foreground">
-            Ask questions about your study materials
+            {readAloudEnabled
+              ? "Read-aloud on — tutor replies use MiniMax voice"
+              : "Tap the mic to hear tutor replies (MiniMax voice)"}
           </p>
         </div>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <Button
             variant="outline"
             onClick={() => setShowMaterialPicker(!showMaterialPicker)}
@@ -125,7 +174,7 @@ export function ChatWindow({
               <div className="p-2">
                 {materials.map((material) => (
                   <button
-                    key={material.id}
+                    key={material.id || "empty"}
                     type="button"
                     onClick={() => {
                       onSelectMaterial(material);
@@ -143,7 +192,9 @@ export function ChatWindow({
                       <p className="text-sm font-medium text-foreground truncate">
                         {material.name}
                       </p>
-                      <p className="text-xs text-muted-foreground">{material.subject}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {material.subject}
+                      </p>
                     </div>
                   </button>
                 ))}
@@ -165,14 +216,26 @@ export function ChatWindow({
                   Start a conversation
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                  Ask me anything about your study materials. I can explain concepts,
-                  answer questions, and help you prepare for exams.
+                  Ask about your study materials. Turn on the mic below to hear
+                  replies read aloud with MiniMax voice.
                 </p>
               </div>
             )}
 
             {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+              <MessageBubble
+                key={message.id}
+                message={message}
+                speech={speechByMessageId[message.id]}
+                isSpeaking={speakingId === message.id}
+                onReplay={
+                  readAloudEnabled &&
+                  onReplay &&
+                  speechByMessageId[message.id]
+                    ? () => onReplay(message.id)
+                    : undefined
+                }
+              />
             ))}
 
             {isTyping && (
@@ -199,9 +262,37 @@ export function ChatWindow({
               />
             </div>
             <Button
-              onClick={onSend}
-              disabled={!input.trim() || isTyping}
-              className="bg-indigo-600 hover:bg-indigo-500 h-11 w-11 p-0"
+              type="button"
+              variant={readAloudEnabled ? "default" : "outline"}
+              onClick={() => {
+                if (!readAloudEnabled) {
+                  unlockAudioPlayback();
+                }
+                onReadAloudToggle();
+              }}
+              disabled={isTyping}
+              aria-label={
+                readAloudEnabled ? "Turn off read aloud" : "Turn on read aloud"
+              }
+              aria-pressed={readAloudEnabled}
+              className={cn(
+                "h-11 w-11 p-0 shrink-0",
+                readAloudEnabled
+                  ? "bg-indigo-600 hover:bg-indigo-500 text-white ring-2 ring-indigo-400/50"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Mic className="w-4 h-4" />
+            </Button>
+            <Button
+              onClick={() => {
+                if (readAloudEnabled) {
+                  unlockAudioPlayback();
+                }
+                onSend();
+              }}
+              disabled={!input.trim() || isTyping || !selectedMaterial.id}
+              className="bg-indigo-600 hover:bg-indigo-500 h-11 w-11 p-0 shrink-0"
             >
               <Send className="w-4 h-4" />
             </Button>
@@ -211,3 +302,4 @@ export function ChatWindow({
     </div>
   );
 }
+

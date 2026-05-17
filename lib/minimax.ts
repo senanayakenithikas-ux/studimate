@@ -742,6 +742,9 @@ export async function tutorChat(
 
     return await callMiniMaxWithMessages(messages, 1536);
   } catch (error) {
+    if (error instanceof MiniMaxError) {
+      throw error;
+    }
     const message = error instanceof Error ? error.message : "Unknown tutorChat error";
     throw new Error(`tutorChat failed: ${message}`);
   }

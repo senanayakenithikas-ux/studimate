@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { jsonError, jsonOk } from "@/lib/api";
-import { getMiniMaxErrorMessage, tutorChat, type Message } from "@/lib/minimax";
+import {
+  getMiniMaxErrorMessage,
+  MiniMaxError,
+  tutorChat,
+  type Message,
+} from "@/lib/minimax";
+import {
+  downloadStudyMaterialText,
+  mapStudyMaterialStorageRow,
+} from "@/lib/study-material-storage";
 import { buildTutorSpeechPayload } from "@/lib/tutor-tts";
 import { getAuthedSupabase } from "@/lib/supabase-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -10,6 +19,7 @@ interface PostTutorBody {
   session_id?: string;
   material_id?: string;
   message?: string;
+  include_speech?: boolean;
 }
 
 interface ChatSessionRecord {
@@ -79,7 +89,7 @@ async function fetchMaterialContext(
 ): Promise<string> {
   const { data, error } = await supabase
     .from("study_materials")
-    .select("extracted_text")
+    .select("id, user_id, filename, storage_url, extracted_text, file_path")
     .eq("id", materialId)
     .eq("user_id", userId)
     .single();
@@ -88,9 +98,13 @@ async function fetchMaterialContext(
     return "";
   }
 
-  const record = data as Record<string, unknown>;
-  const text = record.extracted_text;
-  return typeof text === "string" ? text : "";
+  const row = mapStudyMaterialStorageRow(data as Record<string, unknown>);
+  try {
+    return await downloadStudyMaterialText(supabase, row);
+  } catch {
+    const cached = row.extracted_text?.trim() ?? "";
+    return cached;
+  }
 }
 
 /* --- HTTP METHOD HANDLERS --- */
@@ -147,7 +161,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (materialId) {
         const { data: materialRow, error: materialError } = await supabase
           .from("study_materials")
-          .select("id, extracted_text")
+          .select("id")
           .eq("id", materialId)
           .eq("user_id", userId)
           .single();
@@ -156,9 +170,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           return errorResponse("Study material not found", 404);
         }
 
-        const material = materialRow as Record<string, unknown>;
-        const extractedText = material.extracted_text;
-        context = typeof extractedText === "string" ? extractedText : "";
+        context = await fetchMaterialContext(supabase, materialId, userId);
       }
 
       const { data: newSession, error: insertError } = await supabase
@@ -208,7 +220,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       createdAt: new Date().toISOString(),
     };
 
-    const speech = await buildTutorSpeechPayload(aiReply, "hd");
+    const includeSpeech = body.include_speech !== false;
+    const speech = includeSpeech
+      ? await buildTutorSpeechPayload(aiReply, "hd")
+      : {
+          spokenText: "",
+          audioBase64: null,
+          audioMime: "audio/mpeg",
+        };
 
     return jsonOk({
       sessionId,
@@ -221,7 +240,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (errMessage === "Unauthorized") {
       return errorResponse("Unauthorized", 401);
     }
-    if (errMessage.includes("MiniMax")) {
+    if (error instanceof MiniMaxError || errMessage.includes("MiniMax")) {
       return errorResponse(getMiniMaxErrorMessage(error), 502);
     }
     return errorResponse(errMessage, 500);

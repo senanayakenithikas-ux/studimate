@@ -1,5 +1,14 @@
 import { jsonError, jsonOk } from "@/lib/api";
-import { getMiniMaxErrorMessage, tutorChat, type Message } from "@/lib/minimax";
+import {
+  getMiniMaxErrorMessage,
+  MiniMaxError,
+  tutorChat,
+  type Message,
+} from "@/lib/minimax";
+import {
+  downloadStudyMaterialText,
+  mapStudyMaterialStorageRow,
+} from "@/lib/study-material-storage";
 import { getAuthedSupabase } from "@/lib/supabase-server";
 import { buildTutorSpeechPayload } from "@/lib/tutor-tts";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -30,28 +39,37 @@ async function fetchMaterialContext(
   userId: string,
   materialId?: string,
 ): Promise<string> {
-  if (materialId?.trim()) {
-    const { data } = await supabase
+  const loadRow = async (id: string) => {
+    const { data, error } = await supabase
       .from("study_materials")
-      .select("extracted_text")
-      .eq("id", materialId.trim())
+      .select("id, user_id, filename, storage_url, extracted_text, file_path")
+      .eq("id", id)
       .eq("user_id", userId)
       .single();
 
-    const text = (data as Record<string, unknown> | null)?.extracted_text;
-    return typeof text === "string" ? text : "";
+    if (error || !data) return "";
+    const row = mapStudyMaterialStorageRow(data as Record<string, unknown>);
+    try {
+      return await downloadStudyMaterialText(supabase, row);
+    } catch {
+      return row.extracted_text?.trim() ?? "";
+    }
+  };
+
+  if (materialId?.trim()) {
+    return loadRow(materialId.trim());
   }
 
   const { data } = await supabase
     .from("study_materials")
-    .select("extracted_text")
+    .select("id")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const text = (data as Record<string, unknown> | null)?.extracted_text;
-  return typeof text === "string" ? text : "";
+  if (!data) return "";
+  return loadRow(String((data as Record<string, unknown>).id));
 }
 
 /**
@@ -114,7 +132,7 @@ export async function POST(request: Request) {
     if (errMessage === "Unauthorized") {
       return jsonError("Unauthorized", 401);
     }
-    if (errMessage.includes("MiniMax")) {
+    if (error instanceof MiniMaxError || errMessage.includes("MiniMax")) {
       return jsonError(getMiniMaxErrorMessage(error), 502);
     }
     return jsonError(errMessage, 500);

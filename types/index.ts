@@ -41,6 +41,14 @@ export interface StudySession {
   scheduledAt: string;
 }
 
+export interface TodayScheduleTask {
+  id: string;
+  subject: string;
+  topic: string;
+  duration: number;
+  completed: boolean;
+}
+
 export interface Streak {
   current: number;
   longest: number;
@@ -80,6 +88,24 @@ export interface TutorMessage {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+}
+
+export interface TutorSpeechFields {
+  spokenText?: string;
+  audioBase64?: string | null;
+  audioMime?: string;
+}
+
+export interface TutorPostResponse extends TutorSpeechFields {
+  sessionId: string;
+  message: TutorMessage;
+  history?: { role: "user" | "assistant"; content: string }[];
+}
+
+export interface TutorVoicePostResponse extends TutorSpeechFields {
+  message: TutorMessage;
+  history: { role: "user" | "assistant"; content: string }[];
+  ephemeral: boolean;
 }
 
 export interface LoginBody {

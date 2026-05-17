@@ -18,6 +18,34 @@ function copyResponseCookies(from: NextResponse, to: NextResponse) {
   });
 }
 
+function isStaleRefreshError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "refresh_token_not_found"
+  );
+}
+
+async function getVerifiedSession(
+  supabase: ReturnType<typeof createServerClient>,
+): Promise<boolean> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (user && !userError) {
+    return true;
+  }
+
+  if (isStaleRefreshError(userError)) {
+    await supabase.auth.signOut();
+  }
+
+  return false;
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -53,12 +81,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (pathname === "/") {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    const hasVerifiedSession = Boolean(user && !userError);
+    const hasVerifiedSession = await getVerifiedSession(supabase);
     if (hasVerifiedSession) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
@@ -69,12 +92,7 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  const hasVerifiedSession = Boolean(user && !userError);
+  const hasVerifiedSession = await getVerifiedSession(supabase);
   const isPublicRoute = PUBLIC_PATHS.has(pathname);
   const isAuthRoute = pathname === "/login" || pathname === "/signup";
 

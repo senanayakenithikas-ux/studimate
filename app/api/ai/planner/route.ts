@@ -19,6 +19,7 @@ import {
   ensurePlannerUserProfile,
   resolvePlannerUserId,
 } from "@/lib/planner-auth";
+import { getRollingPlanRange } from "@/lib/planner-dates";
 import { syncUserStreak } from "@/lib/user-streak-sync";
 import { createServerClient } from "@/lib/supabase-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -52,20 +53,6 @@ interface ScheduleRecord {
 
 function errorResponse(message: string, status: number): NextResponse {
   return NextResponse.json({ error: message }, { status });
-}
-
-/** Inclusive 7-day window: today through today + 6 (date_offset 1–7). */
-export function getRollingPlanRange(): { start: string; end: string } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const endRange = new Date(today);
-  endRange.setDate(today.getDate() + 6);
-
-  return {
-    start: today.toISOString().slice(0, 10),
-    end: endRange.toISOString().slice(0, 10),
-  };
 }
 
 function isSubject(value: unknown): value is Subject {

@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import {
   BookOpen,
   Calendar,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Target,
 } from "lucide-react";

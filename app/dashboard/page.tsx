@@ -9,9 +9,12 @@ import { SubjectCard } from "@/components/dashboard/SubjectCard";
 import { TodayPlan } from "@/components/dashboard/TodayPlan";
 import { CardSkeleton } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
-import { mockTodaySessions, type Session } from "@/lib/mock-data";
 import { apiFetch } from "@/lib/client-fetch";
-import type { Subject as ApiSubject, UserSyncResult } from "@/types";
+import type {
+  Subject as ApiSubject,
+  TodayScheduleTask,
+  UserSyncResult,
+} from "@/types";
 import { Calendar, Brain, MessageSquare, Sparkles, Plus } from "lucide-react";
 import {
   Dialog,
@@ -96,7 +99,7 @@ function DashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [streak, setStreak] = useState(0);
   const [subjects, setSubjects] = useState<DashboardSubject[]>([]);
-  const [todaySessions, setTodaySessions] = useState<Session[]>([]);
+  const [todaySessions, setTodaySessions] = useState<TodayScheduleTask[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newSubject, setNewSubject] = useState({
     name: "",
@@ -109,9 +112,10 @@ function DashboardContent() {
     async function load() {
       setError(null);
       try {
-        const [syncData, subjectsData] = await Promise.all([
+        const [syncData, subjectsData, todayTasks] = await Promise.all([
           apiFetch<UserSyncResult>("/api/users/sync", { method: "POST" }),
           apiFetch<ApiSubject[]>("/api/subjects"),
+          apiFetch<TodayScheduleTask[]>("/api/sessions"),
         ]);
         setStreak(syncData.streak_count);
         setSubjects(
@@ -125,7 +129,7 @@ function DashboardContent() {
             color: subjectColors[i % subjectColors.length],
           })),
         );
-        setTodaySessions(mockTodaySessions);
+        setTodaySessions(todayTasks);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load dashboard",
@@ -137,13 +141,13 @@ function DashboardContent() {
     void load();
   }, []);
 
-  const toggleSession = async (id: number) => {
+  const toggleSession = async (id: string) => {
     const session = todaySessions.find((s) => s.id === id);
     if (!session || session.completed) return;
     try {
       await apiFetch("/api/sessions", {
         method: "POST",
-        body: JSON.stringify({ sessionId: String(id) }),
+        body: JSON.stringify({ sessionId: id }),
       });
       setTodaySessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, completed: true } : s)),
