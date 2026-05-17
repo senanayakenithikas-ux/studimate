@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Calendar, Check } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import {
   fetchTodayScheduleTasks,
   updateScheduleTaskCompleted,
@@ -102,8 +101,7 @@ export function TodayPlan() {
       setError(null);
       setIsLoading(true);
       try {
-        const supabase = createClient();
-        const rows = await fetchTodayScheduleTasks(supabase);
+        const rows = await fetchTodayScheduleTasks();
         if (!cancelled) {
           setTasks(rows);
         }
@@ -143,8 +141,7 @@ export function TodayPlan() {
     if (nextCompleted === null) return;
 
     try {
-      const supabase = createClient();
-      await updateScheduleTaskCompleted(supabase, id, nextCompleted);
+      await updateScheduleTaskCompleted(id, nextCompleted);
     } catch {
       setTasks(snapshot);
     }

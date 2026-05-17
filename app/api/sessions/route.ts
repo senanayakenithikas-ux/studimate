@@ -72,21 +72,25 @@ export async function POST(request: Request) {
 
   const { supabase, userId } = ctx;
 
-  let body: { sessionId?: string };
+  let body: { sessionId?: string; completed?: boolean };
   try {
-    body = (await request.json()) as { sessionId?: string };
+    body = (await request.json()) as { sessionId?: string; completed?: boolean };
   } catch {
     return jsonError("Invalid request body", 400);
   }
 
   const sessionId = body.sessionId?.trim();
   if (!sessionId) {
-    return jsonError("sessionId is required");
+    return jsonError("sessionId is required", 400);
+  }
+
+  if (typeof body.completed !== "boolean") {
+    return jsonError("completed must be a boolean", 400);
   }
 
   const { data, error } = await supabase
     .from("schedules")
-    .update({ completed: true })
+    .update({ completed: body.completed })
     .eq("id", sessionId)
     .eq("user_id", userId)
     .select("id, completed")
@@ -100,5 +104,8 @@ export async function POST(request: Request) {
     return jsonError("Session not found", 404);
   }
 
-  return jsonOk({ completed: true, sessionId: data.id });
+  return jsonOk({
+    completed: Boolean(data.completed),
+    sessionId: data.id,
+  });
 }
