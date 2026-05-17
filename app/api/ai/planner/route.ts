@@ -15,10 +15,9 @@ import {
   type PlannerSubjectInput,
 } from "@/lib/planner-context";
 import {
-  getMondayOfWeekString,
   getRollingPlanRange,
+  getSevenDayRangeFromStart,
   getTodayDateString,
-  getWeekRangeFromMonday,
   parseLocalDateString,
 } from "@/lib/planner-dates";
 import { fetchUserProfile } from "@/lib/users";
@@ -53,7 +52,7 @@ const WEEKDAY_NAMES = [
 interface PlannerRequestBody {
   subjects?: Subject[];
   regenerate?: boolean;
-  /** Monday of the calendar week to load (YYYY-MM-DD). */
+  /** First day of a 7-day window to load (YYYY-MM-DD). */
   weekStart?: string;
 }
 
@@ -103,14 +102,12 @@ function weekdayFromDate(dateStr: string): string {
 function scheduleRecordsToWeeklySchedule(
   rows: ScheduleRecord[],
   subjects: Subject[],
-  weekStartMonday: string,
+  rangeStart: string,
 ): WeeklySchedule {
   const nameById = new Map(subjects.map((s) => [s.id, s.name]));
-  const { start, end } = getWeekRangeFromMonday(
-    parseLocalDateString(weekStartMonday),
-  );
-  const inWeek = rows.filter((row) => row.date >= start && row.date <= end);
-  const sorted = [...inWeek].sort((a, b) => a.date.localeCompare(b.date));
+  const { start, end } = getSevenDayRangeFromStart(rangeStart);
+  const inRange = rows.filter((row) => row.date >= start && row.date <= end);
+  const sorted = [...inRange].sort((a, b) => a.date.localeCompare(b.date));
 
   const slots: PlannerSlot[] = sorted.map((row, index) => ({
     scheduleId: row.id,
@@ -126,17 +123,11 @@ function scheduleRecordsToWeeklySchedule(
   return { weekStart: start, slots };
 }
 
-function resolveWeekStartMonday(
-  body: PlannerRequestBody,
-  rows: ScheduleRecord[],
-): string {
+function resolveRangeStart(body: PlannerRequestBody): string {
   if (body.weekStart?.trim()) {
-    return getMondayOfWeekString(body.weekStart.trim());
+    return getSevenDayRangeFromStart(body.weekStart.trim()).start;
   }
-  if (rows[0]?.date) {
-    return getMondayOfWeekString(rows[0].date);
-  }
-  return getMondayOfWeekString(getTodayDateString());
+  return getRollingPlanRange().start;
 }
 
 function plannerSuccessPayload(
@@ -145,11 +136,10 @@ function plannerSuccessPayload(
   cached: boolean,
   saved: boolean,
   streakCount?: number,
-  weekStartMonday?: string,
+  rangeStart?: string,
 ): Record<string, unknown> {
-  const monday =
-    weekStartMonday ?? resolveWeekStartMonday({}, rows);
-  const view = scheduleRecordsToWeeklySchedule(rows, subjects, monday);
+  const start = rangeStart ?? resolveRangeStart({});
+  const view = scheduleRecordsToWeeklySchedule(rows, subjects, start);
   return {
     data: view,
     view,
@@ -526,7 +516,14 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
 
     return NextResponse.json(
-      plannerSuccessPayload(records, subjects, true, false),
+      plannerSuccessPayload(
+        records,
+        subjects,
+        true,
+        false,
+        undefined,
+        getRollingPlanRange().start,
+      ),
     );
   } catch (error) {
     const message =
@@ -561,12 +558,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const forceRegenerate = body.regenerate === true;
-    const weekViewMonday = body.weekStart?.trim()
-      ? getMondayOfWeekString(body.weekStart.trim())
+    const rangeViewStart = body.weekStart?.trim()
+      ? getSevenDayRangeFromStart(body.weekStart.trim()).start
       : null;
 
-    const { start, end } = weekViewMonday
-      ? getWeekRangeFromMonday(parseLocalDateString(weekViewMonday))
+    const { start, end } = rangeViewStart
+      ? getSevenDayRangeFromStart(rangeViewStart)
       : getRollingPlanRange();
 
     if (!forceRegenerate) {
@@ -577,7 +574,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         end,
       );
 
-      if (records.length > 0 || weekViewMonday) {
+      if (records.length > 0 || rangeViewStart) {
         return NextResponse.json(
           plannerSuccessPayload(
             records,
@@ -585,7 +582,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             true,
             false,
             undefined,
-            weekViewMonday ?? resolveWeekStartMonday(body, records),
+            rangeViewStart ?? resolveRangeStart(body),
           ),
         );
       }
@@ -681,7 +678,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         false,
         true,
         streakCount,
-        getMondayOfWeekString(getTodayDateString()),
+        getRollingPlanRange().start,
       ),
     );
   } catch (error) {

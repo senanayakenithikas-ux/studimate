@@ -29,8 +29,6 @@ const timeSlots = Array.from({ length: 24 }, (_, i) => {
   return `${i.toString().padStart(2, "0")}:00`;
 });
 
-const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
 function parseTime(timeStr: string): number {
   const [hours, minutes] = timeStr.split(":").map(Number);
   return hours * 60 + minutes;
@@ -244,20 +242,22 @@ function TimeGrid({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Map schedule to day columns
-  const dayScheduleMap = new Map<string, { dayIndex: number; sessions: Session[] }>();
-  schedule.forEach((day, index) => {
-    dayScheduleMap.set(day.day, { dayIndex: index, sessions: day.sessions });
-  });
+  const dayColumns =
+    schedule.length > 0
+      ? schedule
+      : Array.from({ length: 7 }, (_, index) => ({
+          day: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index] ?? "Mon",
+          date: "",
+          sessions: [] as Session[],
+        }));
 
   return (
     <div ref={gridRef} className="bg-card/30 rounded-xl border border-border overflow-hidden max-h-[700px] overflow-y-auto">
       {/* Header Row - Days */}
       <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-border">
         <div className="p-3" /> {/* Empty cell for time column */}
-        {daysOfWeek.map((day, dayIndex) => {
-          const isWeekend = day === "Sat" || day === "Sun";
-          const dayMeta = schedule[dayIndex];
+        {dayColumns.map((dayMeta, dayIndex) => {
+          const isWeekend = dayMeta.day === "Sat" || dayMeta.day === "Sun";
           const dateLabel = dayMeta?.date
             ? new Date(`${dayMeta.date}T12:00:00`).toLocaleDateString("en-US", {
                 month: "short",
@@ -267,13 +267,13 @@ function TimeGrid({
 
           return (
             <div
-              key={day}
+              key={`${dayMeta.date || dayMeta.day}-${dayIndex}`}
               className={cn(
                 "py-2.5 text-center border-l border-border",
                 isWeekend ? "text-amber-400" : "text-foreground",
               )}
             >
-              <p className="text-sm font-semibold">{day}</p>
+              <p className="text-sm font-semibold">{dayMeta.day}</p>
               {dateLabel ? (
                 <p className="text-[11px] font-normal text-muted-foreground mt-0.5">
                   {dateLabel}
@@ -298,9 +298,9 @@ function TimeGrid({
             </div>
 
             {/* Day Columns */}
-            {daysOfWeek.map((day) => (
+            {dayColumns.map((dayMeta, dayIndex) => (
               <div
-                key={`${time}-${day}`}
+                key={`${time}-${dayMeta.date || dayMeta.day}-${dayIndex}`}
                 className="relative border-l border-border/50"
               />
             ))}
@@ -310,24 +310,24 @@ function TimeGrid({
         {/* Session Blocks - Positioned Absolutely */}
         <div className="absolute inset-0 grid grid-cols-[60px_repeat(7,1fr)]">
           <div /> {/* Empty for time column */}
-          {daysOfWeek.map((day) => {
-            const dayData = dayScheduleMap.get(day);
-            return (
-              <div key={day} className="relative border-l border-border/50">
-                {dayData?.sessions.map((session) => (
-                  <SessionBlock
-                    key={session.id}
-                    session={session}
-                    subjectColorMap={subjectColorMap}
-                    onToggle={() => onToggleSession(dayData.dayIndex, session.id)}
-                    isOpen={openSessionId === session.id}
-                    onOpen={() => setOpenSessionId(session.id)}
-                    onClose={() => setOpenSessionId(null)}
-                  />
-                ))}
-              </div>
-            );
-          })}
+          {dayColumns.map((dayMeta, dayIndex) => (
+            <div
+              key={`sessions-${dayMeta.date || dayMeta.day}-${dayIndex}`}
+              className="relative border-l border-border/50"
+            >
+              {dayMeta.sessions.map((session) => (
+                <SessionBlock
+                  key={session.id}
+                  session={session}
+                  subjectColorMap={subjectColorMap}
+                  onToggle={() => onToggleSession(dayIndex, session.id)}
+                  isOpen={openSessionId === session.id}
+                  onOpen={() => setOpenSessionId(session.id)}
+                  onClose={() => setOpenSessionId(null)}
+                />
+              ))}
+            </div>
+          ))}
         </div>
       </div>
     </div>

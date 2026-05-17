@@ -22,7 +22,7 @@ export function updatePlannerSchedule(): Promise<WeeklySchedule> {
   });
 }
 
-/** Load saved sessions for a specific calendar week (Monday YYYY-MM-DD). */
+/** Load saved sessions for a 7-day window starting on rangeStart (YYYY-MM-DD). */
 export function fetchPlannerScheduleForWeek(
   weekStart: string,
 ): Promise<WeeklySchedule> {

@@ -20,11 +20,7 @@ import {
   type PlannerDaySchedule,
 } from "@/lib/schedule-map";
 import type { WeeklySchedule, Subject } from "@/types";
-import {
-  formatDateString,
-  getMondayOfWeek,
-  getMondayOfWeekString,
-} from "@/lib/planner-dates";
+import { formatDateString, parseLocalDateString } from "@/lib/planner-dates";
 import { apiFetch } from "@/lib/client-fetch";
 import {
   buildSubjectColorMap,
@@ -176,14 +172,10 @@ function WeeklyStats({ schedule }: { schedule: DaySchedule[] }) {
   );
 }
 
-function parseWeekStartDate(weekStart: string): Date {
-  const [y, m, d] = weekStart.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  const dayOfWeek = date.getDay();
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  date.setDate(date.getDate() + diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
+function startOfToday(): Date {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
 }
 
 export default function PlannerPage() {
@@ -194,21 +186,19 @@ export default function PlannerPage() {
   const [hasPlanner, setHasPlanner] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<DaySchedule[]>([]);
-  const [currentWeekStart, setCurrentWeekStart] = useState(() =>
-    getMondayOfWeek(new Date()),
-  );
+  const [rangeStart, setRangeStart] = useState(startOfToday);
   const weekCacheRef = useRef<Map<string, DaySchedule[]>>(new Map());
   const [userSubjects, setUserSubjects] = useState<Subject[]>([]);
   const subjectColorMap = buildSubjectColorMap(userSubjects);
 
-  const getWeekLabel = () => {
-    const weekEnd = new Date(currentWeekStart);
-    weekEnd.setDate(currentWeekStart.getDate() + 6);
-    const startStr = currentWeekStart.toLocaleDateString("en-US", {
+  const getRangeLabel = () => {
+    const rangeEnd = new Date(rangeStart);
+    rangeEnd.setDate(rangeStart.getDate() + 6);
+    const startStr = rangeStart.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
     });
-    const endStr = weekEnd.toLocaleDateString("en-US", {
+    const endStr = rangeEnd.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -216,16 +206,16 @@ export default function PlannerPage() {
     return `${startStr} - ${endStr}`;
   };
 
-  const weekKeyFor = useCallback((weekStart: Date) => {
-    return getMondayOfWeekString(formatDateString(weekStart));
+  const rangeKeyFor = useCallback((start: Date) => {
+    return formatDateString(start);
   }, []);
 
-  const displayWeek = useCallback((weekStart: Date, days: DaySchedule[]) => {
-    const key = weekKeyFor(weekStart);
+  const displayRange = useCallback((start: Date, days: DaySchedule[]) => {
+    const key = rangeKeyFor(start);
     weekCacheRef.current.set(key, days);
     setSchedule(days);
-    setCurrentWeekStart(parseWeekStartDate(key));
-  }, [weekKeyFor]);
+    setRangeStart(parseLocalDateString(key));
+  }, [rangeKeyFor]);
 
   const applyWeeklySchedule = useCallback(
     (data: WeeklySchedule, options?: { replaceCache?: boolean }) => {
@@ -237,26 +227,24 @@ export default function PlannerPage() {
         setHasPlanner(true);
       }
 
-      const weekMonday = data.weekStart
-        ? getMondayOfWeekString(data.weekStart)
-        : weekKeyFor(new Date());
+      const rangeKey = data.weekStart ?? rangeKeyFor(startOfToday());
       const days = weeklyScheduleToDaySchedule({
         ...data,
-        weekStart: weekMonday,
+        weekStart: rangeKey,
       });
-      weekCacheRef.current.set(weekMonday, days);
+      weekCacheRef.current.set(rangeKey, days);
       setSchedule(days);
-      setCurrentWeekStart(parseWeekStartDate(weekMonday));
+      setRangeStart(parseLocalDateString(rangeKey));
     },
-    [weekKeyFor],
+    [rangeKeyFor],
   );
 
-  const loadWeekForDate = useCallback(
-    async (weekStart: Date) => {
-      const key = weekKeyFor(weekStart);
+  const loadRangeForDate = useCallback(
+    async (start: Date) => {
+      const key = rangeKeyFor(start);
       const cached = weekCacheRef.current.get(key);
       if (cached) {
-        displayWeek(weekStart, cached);
+        displayRange(start, cached);
         return;
       }
 
@@ -270,7 +258,7 @@ export default function PlannerPage() {
         if (weeklyScheduleHasSessions(data)) {
           setHasPlanner(true);
         }
-        displayWeek(weekStart, days);
+        displayRange(start, days);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load schedule",
@@ -279,7 +267,7 @@ export default function PlannerPage() {
         setIsLoadingWeek(false);
       }
     },
-    [displayWeek, weekKeyFor],
+    [displayRange, rangeKeyFor],
   );
 
   const loadSavedSchedule = useCallback(async () => {
@@ -314,21 +302,21 @@ export default function PlannerPage() {
     void loadUserSubjects();
   }, [loadSavedSchedule, loadUserSubjects]);
 
-  const goToPrevWeek = () => {
-    const newStart = new Date(currentWeekStart);
-    newStart.setDate(currentWeekStart.getDate() - 7);
-    setCurrentWeekStart(newStart);
+  const goToPrevRange = () => {
+    const newStart = new Date(rangeStart);
+    newStart.setDate(rangeStart.getDate() - 7);
+    setRangeStart(newStart);
     if (hasPlanner) {
-      void loadWeekForDate(newStart);
+      void loadRangeForDate(newStart);
     }
   };
 
-  const goToNextWeek = () => {
-    const newStart = new Date(currentWeekStart);
-    newStart.setDate(currentWeekStart.getDate() + 7);
-    setCurrentWeekStart(newStart);
+  const goToNextRange = () => {
+    const newStart = new Date(rangeStart);
+    newStart.setDate(rangeStart.getDate() + 7);
+    setRangeStart(newStart);
     if (hasPlanner) {
-      void loadWeekForDate(newStart);
+      void loadRangeForDate(newStart);
     }
   };
 
@@ -381,13 +369,13 @@ export default function PlannerPage() {
         : d,
     );
     setSchedule(nextSchedule);
-    weekCacheRef.current.set(weekKeyFor(currentWeekStart), nextSchedule);
+    weekCacheRef.current.set(rangeKeyFor(rangeStart), nextSchedule);
 
     try {
       await updateScheduleTaskCompleted(sessionId, nextCompleted);
     } catch {
       setSchedule(snapshot);
-      weekCacheRef.current.set(weekKeyFor(currentWeekStart), snapshot);
+      weekCacheRef.current.set(rangeKeyFor(rangeStart), snapshot);
     }
   };
 
@@ -397,14 +385,14 @@ export default function PlannerPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Study Planner</h1>
           <p className="text-sm text-muted-foreground">
-            Your AI-generated weekly study schedule
+            Your AI-generated study schedule for the next 7 days
           </p>
         </div>
         {hasPlanner && !isLoading && !isBusy && (
           <WeekNavigator
-            weekLabel={getWeekLabel()}
-            onPrev={goToPrevWeek}
-            onNext={goToNextWeek}
+            weekLabel={getRangeLabel()}
+            onPrev={goToPrevRange}
+            onNext={goToNextRange}
           />
         )}
       </div>

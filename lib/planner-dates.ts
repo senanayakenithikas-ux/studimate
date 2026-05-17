@@ -6,7 +6,10 @@ export function getTodayDateString(): string {
 export function formatDateString(date: Date): string {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 /** Monday 00:00 local time for the week containing `date`. */
@@ -41,14 +44,23 @@ export function getWeekRangeFromMonday(monday: Date): {
 
 /** Inclusive 7-day window: today through today + 6. */
 export function getRollingPlanRange(): { start: string; end: string } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  return getSevenDayRangeFromStart(new Date());
+}
 
-  const endRange = new Date(today);
-  endRange.setDate(today.getDate() + 6);
+/** Inclusive 7-day window starting on `start` (local date or YYYY-MM-DD). */
+export function getSevenDayRangeFromStart(start: Date | string): {
+  start: string;
+  end: string;
+} {
+  const startDate =
+    typeof start === "string" ? parseLocalDateString(start) : new Date(start);
+  startDate.setHours(0, 0, 0, 0);
+
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6);
 
   return {
-    start: formatDateString(today),
-    end: formatDateString(endRange),
+    start: formatDateString(startDate),
+    end: formatDateString(endDate),
   };
 }
