@@ -3,13 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Calendar, Brain, MessageSquare } from "lucide-react";
+import {
+  LayoutDashboard,
+  Calendar,
+  Brain,
+  MessageSquare,
+  Settings,
+} from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/planner", label: "Plan", icon: Calendar },
   { href: "/quiz", label: "Quiz", icon: Brain },
   { href: "/tutor", label: "Tutor", icon: MessageSquare },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function BottomNav() {

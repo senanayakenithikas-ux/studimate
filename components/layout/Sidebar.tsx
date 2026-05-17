@@ -10,6 +10,7 @@ import {
   Brain,
   MessageSquare,
   Upload,
+  Settings,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useUserProfile } from "@/hooks/use-user-profile";
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/quiz", label: "Quiz", icon: Brain },
   { href: "/tutor", label: "Tutor", icon: MessageSquare },
   { href: "/upload", label: "Upload", icon: Upload },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 interface SidebarProps {

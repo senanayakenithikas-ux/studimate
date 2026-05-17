@@ -1,11 +1,12 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, .default *));
 
-/* Studimate Design System - Dark Slate Theme */
-:root {
-  /* Using dark theme as default for Studimate */
+/* Studimate Design System */
+:root,
+.default {
+  /* Default theme — original Studimate look */
   --background: oklch(0.129 0.042 264.695); /* slate-950 */
   --foreground: oklch(0.929 0.013 255.508); /* slate-100 */
   
@@ -55,38 +56,38 @@
 .dark {
   --background: oklch(0.129 0.042 264.695); /* slate-950 */
   --foreground: oklch(0.929 0.013 255.508); /* slate-100 */
-  
+
   --card: oklch(0.279 0.041 260.031); /* slate-800 */
-  --card-foreground: oklch(0.929 0.013 255.508); /* slate-100 */
-  
-  --popover: oklch(0.279 0.041 260.031); /* slate-800 */
-  --popover-foreground: oklch(0.929 0.013 255.508); /* slate-100 */
-  
+  --card-foreground: oklch(0.929 0.013 255.508);
+
+  --popover: oklch(0.279 0.041 260.031);
+  --popover-foreground: oklch(0.929 0.013 255.508);
+
   --primary: oklch(0.541 0.281 263.657); /* indigo-600 */
-  --primary-foreground: oklch(0.985 0 0); /* white */
-  
+  --primary-foreground: oklch(0.985 0 0);
+
   --secondary: oklch(0.334 0.045 257.281); /* slate-700 */
-  --secondary-foreground: oklch(0.929 0.013 255.508); /* slate-100 */
-  
-  --muted: oklch(0.334 0.045 257.281); /* slate-700 */
-  --muted-foreground: oklch(0.704 0.04 256.788); /* slate-400 */
-  
+  --secondary-foreground: oklch(0.929 0.013 255.508);
+
+  --muted: oklch(0.334 0.045 257.281);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+
   --accent: oklch(0.765 0.177 163.223); /* emerald-400 */
-  --accent-foreground: oklch(0.166 0.058 152.934); /* emerald-950 */
-  
-  --destructive: oklch(0.645 0.246 16.439); /* rose-500 */
+  --accent-foreground: oklch(0.166 0.058 152.934);
+
+  --destructive: oklch(0.645 0.246 16.439);
   --destructive-foreground: oklch(0.985 0 0);
-  
-  --border: oklch(0.334 0.045 257.281); /* slate-700 */
-  --input: oklch(0.279 0.041 260.031); /* slate-800 */
-  --ring: oklch(0.541 0.281 263.657); /* indigo-500 */
-  
+
+  --border: oklch(0.334 0.045 257.281);
+  --input: oklch(0.279 0.041 260.031);
+  --ring: oklch(0.541 0.281 263.657);
+
   --chart-1: oklch(0.541 0.281 263.657);
   --chart-2: oklch(0.765 0.177 163.223);
   --chart-3: oklch(0.606 0.25 292.717);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.645 0.246 16.439);
-  
+
   --sidebar: oklch(0.208 0.042 265.755);
   --sidebar-foreground: oklch(0.929 0.013 255.508);
   --sidebar-primary: oklch(0.541 0.281 263.657);
@@ -94,6 +95,51 @@
   --sidebar-accent: oklch(0.334 0.045 257.281);
   --sidebar-accent-foreground: oklch(0.929 0.013 255.508);
   --sidebar-border: oklch(0.334 0.045 257.281);
+  --sidebar-ring: oklch(0.541 0.281 263.657);
+}
+
+.light {
+  --background: oklch(0.984 0.003 247.858); /* slate-50 */
+  --foreground: oklch(0.208 0.042 265.755); /* slate-900 */
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.208 0.042 265.755);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.208 0.042 265.755);
+
+  --primary: oklch(0.541 0.281 263.657); /* indigo-600 */
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.968 0.007 247.896); /* slate-100 */
+  --secondary-foreground: oklch(0.279 0.041 260.031);
+
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417); /* slate-500 */
+
+  --accent: oklch(0.596 0.145 163.225); /* emerald-600 */
+  --accent-foreground: oklch(0.985 0 0);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.929 0.013 255.508); /* slate-200 */
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.541 0.281 263.657);
+
+  --chart-1: oklch(0.541 0.281 263.657);
+  --chart-2: oklch(0.596 0.145 163.225);
+  --chart-3: oklch(0.606 0.25 292.717);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.645 0.246 16.439);
+
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-primary: oklch(0.541 0.281 263.657);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.279 0.041 260.031);
+  --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.541 0.281 263.657);
 }
 
@@ -147,21 +193,50 @@
   }
 }
 
-/* Custom scrollbar for dark theme */
+/* Scrollbars */
+:root,
+.default,
+.dark {
+  scrollbar-color: oklch(0.334 0.045 257.281) oklch(0.208 0.042 265.755);
+}
+
+.light {
+  scrollbar-color: oklch(0.869 0.022 252.894) oklch(0.968 0.007 247.896);
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
+:root::-webkit-scrollbar-track,
+.default::-webkit-scrollbar-track,
+.dark::-webkit-scrollbar-track {
   background: oklch(0.208 0.042 265.755);
 }
 
-::-webkit-scrollbar-thumb {
+.light::-webkit-scrollbar-track {
+  background: oklch(0.968 0.007 247.896);
+}
+
+:root::-webkit-scrollbar-thumb,
+.default::-webkit-scrollbar-thumb,
+.dark::-webkit-scrollbar-thumb {
   background: oklch(0.334 0.045 257.281);
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+.light::-webkit-scrollbar-thumb {
+  background: oklch(0.869 0.022 252.894);
+  border-radius: 4px;
+}
+
+:root::-webkit-scrollbar-thumb:hover,
+.default::-webkit-scrollbar-thumb:hover,
+.dark::-webkit-scrollbar-thumb:hover {
   background: oklch(0.446 0.043 257.281);
+}
+
+.light::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.704 0.04 256.788);
 }

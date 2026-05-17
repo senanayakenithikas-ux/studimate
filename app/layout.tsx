@@ -52,7 +52,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark bg-background">
+    <html lang="en" className="default" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${geistMono.variable} font-sans antialiased min-h-screen`}
       >
