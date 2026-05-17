@@ -7,13 +7,13 @@ import { useUserProfile } from "@/hooks/use-user-profile";
 import { StreakWidget } from "@/components/dashboard/StreakWidget";
 import { SubjectCard } from "@/components/dashboard/SubjectCard";
 import { TodayPlan } from "@/components/dashboard/TodayPlan";
-import { CardSkeleton } from "@/components/loading-spinner";
+import { CardSkeleton, LoadingSpinner } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/client-fetch";
 import type {
+  Streak,
   Subject as ApiSubject,
   TodayScheduleTask,
-  UserSyncResult,
 } from "@/types";
 import { Calendar, Brain, MessageSquare, Sparkles, Plus } from "lucide-react";
 import {
@@ -101,6 +101,7 @@ function DashboardContent() {
   const [subjects, setSubjects] = useState<DashboardSubject[]>([]);
   const [todaySessions, setTodaySessions] = useState<TodayScheduleTask[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAddingSubject, setIsAddingSubject] = useState(false);
   const [newSubject, setNewSubject] = useState({
     name: "",
     examDate: "",
@@ -112,12 +113,12 @@ function DashboardContent() {
     async function load() {
       setError(null);
       try {
-        const [syncData, subjectsData, todayTasks] = await Promise.all([
-          apiFetch<UserSyncResult>("/api/users/sync", { method: "POST" }),
+        const [streakData, subjectsData, todayTasks] = await Promise.all([
+          apiFetch<Streak>("/api/streaks"),
           apiFetch<ApiSubject[]>("/api/subjects"),
           apiFetch<TodayScheduleTask[]>("/api/sessions"),
         ]);
-        setStreak(syncData.streak_count);
+        setStreak(streakData.current);
         setSubjects(
           subjectsData.map((s, i) => ({
             id: s.id,
@@ -158,8 +159,9 @@ function DashboardContent() {
   };
 
   const handleAddSubject = async () => {
-    if (!newSubject.name || !newSubject.examDate) return;
+    if (isAddingSubject || !newSubject.name || !newSubject.examDate) return;
 
+    setIsAddingSubject(true);
     try {
       const created = await apiFetch<ApiSubject>("/api/subjects", {
         method: "POST",
@@ -186,7 +188,14 @@ function DashboardContent() {
       setIsAddDialogOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add subject");
+    } finally {
+      setIsAddingSubject(false);
     }
+  };
+
+  const handleAddDialogOpenChange = (open: boolean) => {
+    if (!open && isAddingSubject) return;
+    setIsAddDialogOpen(open);
   };
 
   // Get greeting based on time
@@ -265,7 +274,7 @@ function DashboardContent() {
               <h2 className="text-lg font-semibold text-foreground">
                 Your Subjects
               </h2>
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <Dialog open={isAddDialogOpen} onOpenChange={handleAddDialogOpenChange}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
                     <Plus className="w-4 h-4" />
@@ -283,6 +292,7 @@ function DashboardContent() {
                         id="name"
                         placeholder="e.g. Mathematics"
                         value={newSubject.name}
+                        disabled={isAddingSubject}
                         onChange={(e) =>
                           setNewSubject((prev) => ({ ...prev, name: e.target.value }))
                         }
@@ -294,6 +304,7 @@ function DashboardContent() {
                         id="examDate"
                         type="date"
                         value={newSubject.examDate}
+                        disabled={isAddingSubject}
                         onChange={(e) =>
                           setNewSubject((prev) => ({ ...prev, examDate: e.target.value }))
                         }
@@ -309,6 +320,7 @@ function DashboardContent() {
                           max="8"
                           step="0.5"
                           value={newSubject.dailyHours}
+                          disabled={isAddingSubject}
                           onChange={(e) =>
                             setNewSubject((prev) => ({
                               ...prev,
@@ -325,6 +337,7 @@ function DashboardContent() {
                           min="1"
                           max="10"
                           value={newSubject.confidence}
+                          disabled={isAddingSubject}
                           onChange={(e) =>
                             setNewSubject((prev) => ({
                               ...prev,
@@ -335,12 +348,25 @@ function DashboardContent() {
                       </div>
                     </div>
                     <Button
-                      onClick={handleAddSubject}
+                      onClick={() => void handleAddSubject()}
                       className="w-full mt-4"
-                      disabled={!newSubject.name || !newSubject.examDate}
+                      disabled={
+                        isAddingSubject ||
+                        !newSubject.name ||
+                        !newSubject.examDate
+                      }
                     >
-                      Add Subject
+                      {isAddingSubject ? (
+                        <LoadingSpinner size="sm" />
+                      ) : (
+                        "Add Subject"
+                      )}
                     </Button>
+                    {isAddingSubject ? (
+                      <p className="text-center text-sm text-muted-foreground">
+                        Adding subject…
+                      </p>
+                    ) : null}
                   </div>
                 </DialogContent>
               </Dialog>

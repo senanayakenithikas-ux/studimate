@@ -72,16 +72,21 @@ export default function OnboardingPage() {
         method: "PATCH",
         body: JSON.stringify({ onboardingComplete: true }),
       });
-      for (const subject of validSubjects) {
-        await apiFetch("/api/subjects", {
-          method: "POST",
-          body: JSON.stringify({
-            name: subject.name,
-            examDate: subject.examDate,
-            confidence: Math.min(5, Math.max(1, Math.round(subject.confidence / 2))),
+      await Promise.all(
+        validSubjects.map((subject) =>
+          apiFetch("/api/subjects", {
+            method: "POST",
+            body: JSON.stringify({
+              name: subject.name,
+              examDate: subject.examDate,
+              confidence: Math.min(
+                5,
+                Math.max(1, Math.round(subject.confidence / 2)),
+              ),
+            }),
           }),
-        });
-      }
+        ),
+      );
       router.push("/dashboard");
     } catch (err) {
       setError(

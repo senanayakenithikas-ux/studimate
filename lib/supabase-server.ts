@@ -18,7 +18,13 @@ export function createAnonClient(): SupabaseClient {
   });
 }
 
+let serverClientSingleton: SupabaseClient | null = null;
+
 export function createServerClient(): SupabaseClient {
+  if (serverClientSingleton) {
+    return serverClientSingleton;
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
@@ -30,9 +36,11 @@ export function createServerClient(): SupabaseClient {
     );
   }
 
-  return createClient(url, key, {
+  serverClientSingleton = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  return serverClientSingleton;
 }
 
 /** Resolves user id from a Supabase JWT or a stored user id (username login). */
