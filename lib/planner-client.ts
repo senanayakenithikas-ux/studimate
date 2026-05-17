@@ -22,6 +22,16 @@ export function updatePlannerSchedule(): Promise<WeeklySchedule> {
   });
 }
 
+/** Load saved sessions for a specific calendar week (Monday YYYY-MM-DD). */
+export function fetchPlannerScheduleForWeek(
+  weekStart: string,
+): Promise<WeeklySchedule> {
+  return apiFetch<WeeklySchedule>("/api/ai/planner", {
+    method: "POST",
+    body: JSON.stringify({ weekStart }),
+  });
+}
+
 export function weeklyScheduleHasSessions(weekly: WeeklySchedule): boolean {
   return weekly.slots.length > 0;
 }

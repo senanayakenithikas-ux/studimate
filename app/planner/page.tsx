@@ -7,6 +7,7 @@ import { EmptySchedule } from "@/components/empty-state";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
 import {
+  fetchPlannerScheduleForWeek,
   fetchSavedPlannerSchedule,
   generatePlannerSchedule,
   updatePlannerSchedule,
@@ -18,6 +19,7 @@ import {
   type PlannerDaySchedule,
 } from "@/lib/schedule-map";
 import type { WeeklySchedule } from "@/types";
+import { formatDateString, getMondayOfWeek } from "@/lib/planner-dates";
 import { RefreshCw, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
 type DaySchedule = PlannerDaySchedule;
@@ -93,15 +95,15 @@ function SubjectLegend() {
 function WeeklyStats({ schedule }: { schedule: DaySchedule[] }) {
   const totalSessions = schedule.reduce(
     (acc, day) => acc + day.sessions.length,
-    0
+    0,
   );
   const completedSessions = schedule.reduce(
     (acc, day) => acc + day.sessions.filter((s) => s.completed).length,
-    0
+    0,
   );
   const totalMinutes = schedule.reduce(
     (acc, day) => acc + day.sessions.reduce((sum, s) => sum + s.duration, 0),
-    0
+    0,
   );
   const completedMinutes = schedule.reduce(
     (acc, day) =>
@@ -109,7 +111,7 @@ function WeeklyStats({ schedule }: { schedule: DaySchedule[] }) {
       day.sessions
         .filter((s) => s.completed)
         .reduce((sum, s) => sum + s.duration, 0),
-    0
+    0,
   );
 
   const progressPercent =
@@ -171,17 +173,13 @@ function parseWeekStartDate(weekStart: string): Date {
 export default function PlannerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
+  const [isLoadingWeek, setIsLoadingWeek] = useState(false);
   const [hasSchedule, setHasSchedule] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<DaySchedule[]>([]);
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diff);
-    return monday;
-  });
+  const [currentWeekStart, setCurrentWeekStart] = useState(() =>
+    getMondayOfWeek(new Date()),
+  );
 
   const getWeekLabel = () => {
     const weekEnd = new Date(currentWeekStart);
@@ -198,18 +196,6 @@ export default function PlannerPage() {
     return `${startStr} - ${endStr}`;
   };
 
-  const goToPrevWeek = () => {
-    const newStart = new Date(currentWeekStart);
-    newStart.setDate(currentWeekStart.getDate() - 7);
-    setCurrentWeekStart(newStart);
-  };
-
-  const goToNextWeek = () => {
-    const newStart = new Date(currentWeekStart);
-    newStart.setDate(currentWeekStart.getDate() + 7);
-    setCurrentWeekStart(newStart);
-  };
-
   const applyWeeklySchedule = useCallback((data: WeeklySchedule) => {
     const days = weeklyScheduleToDaySchedule(data);
     setSchedule(days);
@@ -218,6 +204,26 @@ export default function PlannerPage() {
       setCurrentWeekStart(parseWeekStartDate(data.weekStart));
     }
   }, []);
+
+  const loadWeekForDate = useCallback(
+    async (weekStart: Date) => {
+      setIsLoadingWeek(true);
+      setError(null);
+      try {
+        const data = await fetchPlannerScheduleForWeek(
+          formatDateString(weekStart),
+        );
+        applyWeeklySchedule(data);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load schedule",
+        );
+      } finally {
+        setIsLoadingWeek(false);
+      }
+    },
+    [applyWeeklySchedule],
+  );
 
   const loadSavedSchedule = useCallback(async () => {
     setError(null);
@@ -239,6 +245,24 @@ export default function PlannerPage() {
   useEffect(() => {
     void loadSavedSchedule();
   }, [loadSavedSchedule]);
+
+  const goToPrevWeek = () => {
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(currentWeekStart.getDate() - 7);
+    setCurrentWeekStart(newStart);
+    if (hasSchedule) {
+      void loadWeekForDate(newStart);
+    }
+  };
+
+  const goToNextWeek = () => {
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(currentWeekStart.getDate() + 7);
+    setCurrentWeekStart(newStart);
+    if (hasSchedule) {
+      void loadWeekForDate(newStart);
+    }
+  };
 
   async function runScheduleMutation(
     fetcher: () => Promise<WeeklySchedule>,
@@ -302,7 +326,6 @@ export default function PlannerPage() {
 
   return (
     <AppLayout>
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Study Planner</h1>
@@ -342,12 +365,15 @@ export default function PlannerPage() {
         <EmptySchedule onGenerate={handleGenerateSchedule} />
       ) : (
         <div className="flex flex-col xl:flex-row gap-6">
-          {/* Time Grid */}
-          <div className="flex-1 min-w-0 overflow-x-auto">
+          <div className="relative flex-1 min-w-0 overflow-x-auto">
+            {isLoadingWeek ? (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/60 backdrop-blur-[1px]">
+                <LoadingSpinner size="md" text="Loading week…" />
+              </div>
+            ) : null}
             <ScheduleGrid schedule={schedule} onToggleSession={toggleSession} />
           </div>
 
-          {/* Sidebar */}
           <div className="xl:w-64 flex-shrink-0 space-y-4">
             <WeeklyStats schedule={schedule} />
             <SubjectLegend />

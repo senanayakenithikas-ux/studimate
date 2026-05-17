@@ -14,14 +14,19 @@ import {
   type PlannerQuizInput,
   type PlannerSubjectInput,
 } from "@/lib/planner-context";
-import { getTodayDateString } from "@/lib/planner-dates";
+import {
+  getMondayOfWeekString,
+  getRollingPlanRange,
+  getTodayDateString,
+  getWeekRangeFromMonday,
+  parseLocalDateString,
+} from "@/lib/planner-dates";
 import { fetchUserProfile } from "@/lib/users";
 import {
   createPlannerSupabaseClient,
   ensurePlannerUserProfile,
   resolvePlannerUserId,
 } from "@/lib/planner-auth";
-import { getRollingPlanRange } from "@/lib/planner-dates";
 import {
   PLANNER_PROMPT_MAX_CHARS,
   resolveStudyMaterialPromptText,
@@ -48,6 +53,8 @@ const WEEKDAY_NAMES = [
 interface PlannerRequestBody {
   subjects?: Subject[];
   regenerate?: boolean;
+  /** Monday of the calendar week to load (YYYY-MM-DD). */
+  weekStart?: string;
 }
 
 interface ScheduleRecord {
@@ -96,10 +103,14 @@ function weekdayFromDate(dateStr: string): string {
 function scheduleRecordsToWeeklySchedule(
   rows: ScheduleRecord[],
   subjects: Subject[],
+  weekStartMonday: string,
 ): WeeklySchedule {
   const nameById = new Map(subjects.map((s) => [s.id, s.name]));
-  const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
-  const weekStart = sorted[0]?.date ?? new Date().toISOString().slice(0, 10);
+  const { start, end } = getWeekRangeFromMonday(
+    parseLocalDateString(weekStartMonday),
+  );
+  const inWeek = rows.filter((row) => row.date >= start && row.date <= end);
+  const sorted = [...inWeek].sort((a, b) => a.date.localeCompare(b.date));
 
   const slots: PlannerSlot[] = sorted.map((row, index) => ({
     scheduleId: row.id,
@@ -112,7 +123,20 @@ function scheduleRecordsToWeeklySchedule(
     completed: row.completed,
   }));
 
-  return { weekStart, slots };
+  return { weekStart: start, slots };
+}
+
+function resolveWeekStartMonday(
+  body: PlannerRequestBody,
+  rows: ScheduleRecord[],
+): string {
+  if (body.weekStart?.trim()) {
+    return getMondayOfWeekString(body.weekStart.trim());
+  }
+  if (rows[0]?.date) {
+    return getMondayOfWeekString(rows[0].date);
+  }
+  return getMondayOfWeekString(getTodayDateString());
 }
 
 function plannerSuccessPayload(
@@ -121,8 +145,11 @@ function plannerSuccessPayload(
   cached: boolean,
   saved: boolean,
   streakCount?: number,
+  weekStartMonday?: string,
 ): Record<string, unknown> {
-  const view = scheduleRecordsToWeeklySchedule(rows, subjects);
+  const monday =
+    weekStartMonday ?? resolveWeekStartMonday({}, rows);
+  const view = scheduleRecordsToWeeklySchedule(rows, subjects, monday);
   return {
     data: view,
     view,
@@ -533,8 +560,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const { start, end } = getRollingPlanRange();
     const forceRegenerate = body.regenerate === true;
+    const weekViewMonday = body.weekStart?.trim()
+      ? getMondayOfWeekString(body.weekStart.trim())
+      : null;
+
+    const { start, end } = weekViewMonday
+      ? getWeekRangeFromMonday(parseLocalDateString(weekViewMonday))
+      : getRollingPlanRange();
 
     if (!forceRegenerate) {
       const records = await fetchScheduleRecordsInRange(
@@ -544,9 +577,16 @@ export async function POST(request: Request): Promise<NextResponse> {
         end,
       );
 
-      if (records.length > 0) {
+      if (records.length > 0 || weekViewMonday) {
         return NextResponse.json(
-          plannerSuccessPayload(records, subjects, true, false),
+          plannerSuccessPayload(
+            records,
+            subjects,
+            true,
+            false,
+            undefined,
+            weekViewMonday ?? resolveWeekStartMonday(body, records),
+          ),
         );
       }
     }
@@ -635,7 +675,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     const streakCount = await syncStreakAfterPlan(userId, true);
 
     return NextResponse.json(
-      plannerSuccessPayload(records, subjects, false, true, streakCount),
+      plannerSuccessPayload(
+        records,
+        subjects,
+        false,
+        true,
+        streakCount,
+        getMondayOfWeekString(getTodayDateString()),
+      ),
     );
   } catch (error) {
     const message =

@@ -37,7 +37,8 @@ const DAY_NAME_TO_ABBREV: Record<string, string> = {
 export function weeklyScheduleToDaySchedule(
   weekly: WeeklySchedule,
 ): PlannerDaySchedule[] {
-  const weekStart = new Date(weekly.weekStart);
+  const [y, m, d] = weekly.weekStart.split("-").map(Number);
+  const weekStart = new Date(y, m - 1, d);
 
   return DAY_ABBREVS.map((day, index) => {
     const date = new Date(weekStart);
@@ -60,7 +61,7 @@ export function weeklyScheduleToDaySchedule(
 
     return {
       day,
-      date: date.toISOString().slice(0, 10),
+      date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
       sessions,
     };
   });

@@ -291,17 +291,30 @@ function TimeGrid({
       {/* Header Row - Days */}
       <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-border">
         <div className="p-3" /> {/* Empty cell for time column */}
-        {daysOfWeek.map((day) => {
+        {daysOfWeek.map((day, dayIndex) => {
           const isWeekend = day === "Sat" || day === "Sun";
+          const dayMeta = schedule[dayIndex];
+          const dateLabel = dayMeta?.date
+            ? new Date(`${dayMeta.date}T12:00:00`).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })
+            : null;
+
           return (
             <div
               key={day}
               className={cn(
-                "py-3 text-center text-sm font-semibold border-l border-border",
-                isWeekend ? "text-amber-400" : "text-foreground"
+                "py-2.5 text-center border-l border-border",
+                isWeekend ? "text-amber-400" : "text-foreground",
               )}
             >
-              {day}
+              <p className="text-sm font-semibold">{day}</p>
+              {dateLabel ? (
+                <p className="text-[11px] font-normal text-muted-foreground mt-0.5">
+                  {dateLabel}
+                </p>
+              ) : null}
             </div>
           );
         })}

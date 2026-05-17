@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLayout } from "@/components/app-layout";
+import { DeleteAccountSection } from "@/components/settings/DeleteAccountSection";
 import { ThemeSettings } from "@/components/settings/ThemeSettings";
 
 export default function SettingsPage() {
@@ -13,8 +14,9 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="max-w-lg">
+      <div className="max-w-lg space-y-8">
         <ThemeSettings />
+        <DeleteAccountSection />
       </div>
     </AppLayout>
   );
