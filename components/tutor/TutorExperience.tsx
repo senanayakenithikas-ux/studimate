@@ -376,8 +376,7 @@ export function TutorExperience({ initialMode = "text" }: TutorExperienceProps) 
             messages={messages}
             input={input}
             isTyping={isTyping}
-            materials={pickerMaterials}
-            selectedMaterial={selectedMaterial}
+            selectedMaterialId={selectedMaterial.id}
             speechByMessageId={speechByMessageId}
             speakingId={speakingId}
             readAloudEnabled={readAloudEnabled}
@@ -389,7 +388,6 @@ export function TutorExperience({ initialMode = "text" }: TutorExperienceProps) 
                 ? (messageId) => void handleReplay(messageId)
                 : undefined
             }
-            onSelectMaterial={handleSelectMaterial}
           />
         )}
       </div>

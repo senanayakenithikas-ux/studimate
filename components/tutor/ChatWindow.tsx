@@ -1,19 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TutorMessageBody } from "@/components/tutor/TutorMessageBody";
 import { unlockAudioPlayback } from "@/lib/tutor-voice";
 import type { TutorMessage } from "@/types";
-import { ChevronDown, FileText, Send, Sparkles, Volume2 } from "lucide-react";
+import { Send, Sparkles, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface MaterialOption {
-  id: string;
-  name: string;
-  subject: string;
-}
 
 export interface TutorSpeechCache {
   audioBase64: string | null;
@@ -24,8 +18,7 @@ interface ChatWindowProps {
   messages: TutorMessage[];
   input: string;
   isTyping: boolean;
-  materials: MaterialOption[];
-  selectedMaterial: MaterialOption;
+  selectedMaterialId: string;
   speechByMessageId?: Record<string, TutorSpeechCache>;
   speakingId?: string | null;
   readAloudEnabled: boolean;
@@ -33,7 +26,6 @@ interface ChatWindowProps {
   onInputChange: (value: string) => void;
   onSend: () => void;
   onReplay?: (messageId: string) => void;
-  onSelectMaterial: (material: MaterialOption) => void;
 }
 
 function TypingIndicator() {
@@ -110,8 +102,7 @@ export function ChatWindow({
   messages,
   input,
   isTyping,
-  materials,
-  selectedMaterial,
+  selectedMaterialId,
   speechByMessageId = {},
   speakingId = null,
   readAloudEnabled,
@@ -119,9 +110,7 @@ export function ChatWindow({
   onInputChange,
   onSend,
   onReplay,
-  onSelectMaterial,
 }: ChatWindowProps) {
-  const [showMaterialPicker, setShowMaterialPicker] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -147,66 +136,7 @@ export function ChatWindow({
   };
 
   return (
-    <div className="h-[calc(100vh-10rem)] md:h-[calc(100vh-6rem)] flex flex-col">
-      <div className="flex items-center justify-between pb-4 border-b border-border mb-4 gap-3">
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-indigo-400 shrink-0" />
-            AI Tutor
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {readAloudEnabled
-              ? "Read-aloud on — plays written replies (TTS only, not voice chat)"
-              : "MiniMax tutor · type questions below"}
-          </p>
-        </div>
-
-        <div className="relative shrink-0">
-          <Button
-            variant="outline"
-            onClick={() => setShowMaterialPicker(!showMaterialPicker)}
-            className="border-border hover:border-indigo-500/50"
-          >
-            <FileText className="w-4 h-4 mr-2 text-indigo-400" />
-            <span className="max-w-[120px] truncate">{selectedMaterial.name}</span>
-            <ChevronDown className="w-4 h-4 ml-2" />
-          </Button>
-
-          {showMaterialPicker && (
-            <div className="absolute right-0 top-full mt-2 w-72 bg-card rounded-xl border border-border shadow-lg z-10">
-              <div className="p-2">
-                {materials.map((material) => (
-                  <button
-                    key={material.id || "empty"}
-                    type="button"
-                    onClick={() => {
-                      onSelectMaterial(material);
-                      setShowMaterialPicker(false);
-                    }}
-                    className={cn(
-                      "w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left",
-                      selectedMaterial.id === material.id
-                        ? "bg-indigo-500/10"
-                        : "hover:bg-secondary",
-                    )}
-                  >
-                    <FileText className="w-4 h-4 text-indigo-400" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {material.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {material.subject}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
+    <div className="h-[calc(100vh-14rem)] md:h-[calc(100vh-10rem)] flex flex-col">
       <div className="flex-1 flex flex-col min-h-0">
         <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
           <div className="space-y-4 pb-4">
@@ -303,7 +233,7 @@ export function ChatWindow({
                 }
                 onSend();
               }}
-              disabled={!input.trim() || isTyping || !selectedMaterial.id}
+              disabled={!input.trim() || isTyping || !selectedMaterialId}
               className="bg-indigo-600 hover:bg-indigo-500 h-11 w-11 p-0 shrink-0"
             >
               <Send className="w-4 h-4" />
@@ -314,4 +244,3 @@ export function ChatWindow({
     </div>
   );
 }
-
